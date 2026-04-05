@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.space.mapper.SpacePostMapper">
+
+    <resultMap id="SpacePostVOMap" type="com.minichat.space.vo.SpacePostVO">
+        <id property="id" column="id"/>
+        <result property="authorId" column="authorId"/>
+        <result property="authorName" column="authorName"/>
+        <result property="authorAvatar" column="authorAvatar"/>
+        <result property="content" column="content"/>
+        <result property="images" column="images" typeHandler="com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler"/>
+        <result property="imagesCount" column="imagesCount"/>
+        <result property="commentsCount" column="commentsCount"/>
+        <result property="likesCount" column="likesCount"/>
+        <result property="liked" column="liked"/>
+        <result property="createdTime" column="createdTime"/>
+    </resultMap>
+    <delete id="deleteBatchByIds">
+        delete from space_post where id in
+        <foreach collection="expirePostIds" item="expirePostId" open="(" separator="," close=")">
+            #{expirePostId}
+        </foreach>
+    </delete>
+
+    <select id="selectListByUserIdAndFriendIds" resultMap="SpacePostVOMap">
+        SELECT
+            sp.id,
+            sp.author_id AS authorId,
+            u.nickname AS authorName,
+            u.avatar AS authorAvatar,
+            sp.content,
+            sp.images,
+            sp.images_count AS imagesCount,
+            sp.comments_count AS commentsCount,
+            sp.likes_count AS likesCount,
+            EXISTS(
+                SELECT 1
+                FROM space_like sl
+                WHERE sl.post_id = sp.id
+                  AND sl.user_id = #{currentUserId}
+            ) AS liked,
+            sp.created_time AS createdTime
+        FROM space_post sp
+        LEFT JOIN user u ON sp.author_id = u.id
+        WHERE sp.author_id = #{userId} AND sp.status = 0
+        <if test="friendIds != null and friendIds.size() > 0">
+            OR (sp.author_id IN
+            <foreach collection="friendIds" item="friendId" open="(" close=")" separator=",">
+                #{friendId}
+            </foreach>
+            AND sp.status = 0)
+        </if>
+        ORDER BY sp.created_time DESC
+    </select>
+    <select id="selectListByUserIdWithDisabledStatus" resultMap="SpacePostVOMap">
+        SELECT
+            sp.id,
+            sp.author_id AS authorId,
+            u.nickname AS authorName,
+            u.avatar AS authorAvatar,
+            sp.content,
+            sp.images,
+            sp.images_count AS imagesCount,
+            sp.comments_count AS commentsCount,
+            sp.likes_count AS likesCount,
+            EXISTS(
+                SELECT 1
+                FROM space_like sl
+                WHERE sl.post_id = sp.id
+                  AND sl.user_id = #{currentUserId}
+            ) AS liked,
+            sp.created_time AS createdTime
+        FROM space_post sp
+        LEFT JOIN user u ON sp.author_id = u.id
+        WHERE sp.author_id = #{userId} AND sp.status = #{disableStatus}
+        ORDER BY sp.created_time DESC
+    </select>
+
+    <select id="selectListByIds" resultType="com.minichat.space.vo.SpacePostVO">
+        SELECT
+            sp.id,
+            sp.author_id AS authorId,
+            u.nickname AS authorName,
+            u.avatar AS authorAvatar,
+            sp.content,
+            sp.images,
+            sp.images_count AS imagesCount,
+            sp.comments_count AS commentsCount,
+            sp.likes_count AS likesCount,
+            EXISTS(
+                SELECT 1
+                FROM space_like sl
+                WHERE sl.post_id = sp.id
+                  AND sl.user_id = #{currentUserId}
+            ) AS liked,
+            sp.created_time AS createdTime
+        FROM space_post sp
+        LEFT JOIN user u ON sp.author_id = u.id
+        WHERE sp.id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        AND sp.status = 0
+        ORDER BY FIELD(sp.id,
+        <foreach collection="ids" item="id" separator=",">
+            #{id}
+        </foreach>
+        )
+    </select>
+
+    <select id="selectListByAuthorId" resultMap="SpacePostVOMap">
+            SELECT
+            sp.id,
+            sp.author_id AS authorId,
+            u.nickname AS authorName,
+            u.avatar AS authorAvatar,
+            sp.content,
+            sp.images,
+            sp.images_count AS imagesCount,
+            sp.comments_count AS commentsCount,
+            sp.likes_count AS likesCount,
+            EXISTS(
+                SELECT 1
+                FROM space_like sl
+                WHERE sl.post_id = sp.id
+                  AND sl.user_id = #{currentUserId}
+            ) AS liked,
+            sp.created_time AS createdTime
+            FROM space_post sp
+            LEFT JOIN user u ON sp.author_id = u.id
+            WHERE sp.author_id = #{authorId} AND sp.status = 0
+            ORDER BY sp.created_time DESC
+    </select>
+
+</mapper>

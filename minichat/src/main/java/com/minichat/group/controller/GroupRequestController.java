@@ -1,0 +1,65 @@
+package com.minichat.group.controller;
+
+import com.minichat.group.dto.GroupRequestDTO;
+import com.minichat.group.dto.HandleGroupRequestDTO;
+import com.minichat.group.vo.ReceivedGroupRequestVO;
+import com.minichat.group.vo.SentGroupRequestVO;
+import com.minichat.common.result.Result;
+import com.minichat.group.service.GroupRequestService;
+import com.minichat.common.util.UserContext;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/group/request")
+@RequiredArgsConstructor
+public class GroupRequestController {
+
+    private final GroupRequestService groupRequestService;
+
+    //发送群聊申请
+    @PostMapping("/send")
+    public Result<String> sendGroupRequest(@Valid @RequestBody GroupRequestDTO groupRequestDTO) {
+        Long currentUserId = UserContext.getCurUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        return groupRequestService.sendGroupRequest(groupRequestDTO);
+    }
+
+    //获取已发送的群聊申请列表
+    @GetMapping("/sent")
+    public Result<List<SentGroupRequestVO>> getSentGroupRequests() {
+        Long currentUserId = UserContext.getCurUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        List<SentGroupRequestVO> sentGroupRequestVOList = groupRequestService.getSentGroupRequestList(currentUserId);
+        return Result.success(sentGroupRequestVOList);
+    }
+
+    //处理群聊申请
+    @PostMapping("/handle")
+    public Result<String> handleGroupRequest(@Valid @RequestBody HandleGroupRequestDTO handleGroupRequestDTO) {
+        Long currentUserId = UserContext.getCurUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        return groupRequestService.handleGroupRequest(handleGroupRequestDTO);
+    }
+
+    //获取群聊申请列表
+    @GetMapping("/list")
+    public Result<List<ReceivedGroupRequestVO>> getReceivedGroupRequests() {
+        Long currentUserId = UserContext.getCurUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        List<ReceivedGroupRequestVO> receivedGroupRequestVOList = groupRequestService.getReceivedGroupRequestList(currentUserId);
+        return Result.success(receivedGroupRequestVOList);
+    }
+
+}

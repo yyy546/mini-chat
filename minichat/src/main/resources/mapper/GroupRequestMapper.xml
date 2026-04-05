@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.group.mapper.GroupRequestMapper">
+
+    <update id="update">
+        UPDATE group_request
+        <trim prefix="set" suffixOverrides=",">
+            <!-- 状态必更新 -->
+            status = #{status},
+            <!-- 有新留言时才更新message -->
+            <if test="message != null">
+                message = #{message},
+            </if>
+            <!-- 重新发送场景：设置了createdTime才更新 -->
+            <if test="createdTime != null">
+                created_time = #{createdTime},
+            </if>
+            <!-- 处理请求场景：设置了processedTime才更新 -->
+            <if test="processedTime != null">
+                processed_time = #{processedTime}
+            </if>
+        </trim>
+        WHERE id = #{id}
+    </update>
+</mapper>

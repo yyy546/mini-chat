@@ -1,0 +1,74 @@
+:root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+html.dark {
+  /* Global Backgrounds - Lighter Dark Mode */
+  --el-bg-color: #2b2b2b; /* Sidebar, Cards, Bubbles(default) */
+  --el-bg-color-page: #202020; /* Main App Background (Chat Window) */
+  --el-bg-color-overlay: #333333; /* Dialogs, Popovers, and now Bubbles */
+  
+  /* Text */
+  --el-text-color-primary: #e0e0e0;
+  --el-text-color-regular: #cfcfcf;
+  --el-text-color-secondary: #a0a0a0;
+
+  /* Borders */
+  --el-border-color: #4c4c4c;
+  --el-border-color-light: #444444;
+  --el-border-color-lighter: #3a3a3a;
+  
+  /* Fill */
+  --el-fill-color-light: #3a3a3a;
+  --el-fill-color-lighter: #333333;
+
+  /* Primary Color (Darker Blue for Dark Mode) */
+  --el-color-primary: #1e60b0; /* Deep Blue for self bubbles and buttons */
+  --el-color-primary-light-3: #2b70c9;
+  --el-color-primary-light-5: #3e85e0;
+  --el-color-primary-light-7: #5a9cf8;
+  --el-color-primary-light-8: #78b0ff;
+  --el-color-primary-light-9: #9cc5ff;
+  --el-color-primary-dark-2: #164a8a;
+
+  --el-input-focus-border-color: var(--el-border-color);
+  --el-input-hover-border-color: var(--el-border-color);
+}
+
+html.dark .el-input__wrapper.is-focus,
+html.dark .el-input__wrapper:focus-within,
+html.dark .el-select__wrapper.is-focused,
+html.dark .el-select__wrapper:focus-within,
+html.dark .el-textarea__inner:focus,
+html.dark .el-textarea__inner:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+}

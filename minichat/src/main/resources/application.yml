@@ -1,0 +1,91 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  address: 0.0.0.0
+
+spring:
+  profiles:
+    include: local
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  datasource:
+    url: jdbc:mysql://localhost:3306/minichat?useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+    username: ${spring.datasource.username}
+    password: ${spring.datasource.password:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    virtual-host: /
+    username: ${spring.rabbitmq.username:}
+    password: ${spring.rabbitmq.password:}
+    listener:
+      direct:
+        retry:
+          enabled: true
+          multiplier: 1
+          initial-interval: 1000
+          max-attempts: 3
+
+  elasticsearch:
+    uris: http://localhost:9200
+    socket-timeout: 30s
+    username: elastic
+    password: ${spring.elasticsearch.password:}
+    indices:
+      memory:
+        index_buffer_size: 20%
+      cache:
+        filter:
+          size: 20%
+
+
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+  messaging:
+    stomp:
+      relay:
+        allow-origins: "*"
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 1
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.minichat.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: ${jwt.secret}
+  expiration: 86400000
+
+  header: Authorization
+
+file:
+  large-threshold-byte: 10485760
+
+snowflake:
+  datacenter-id: 1
+  worker-id: 1
+
+
+
+
+

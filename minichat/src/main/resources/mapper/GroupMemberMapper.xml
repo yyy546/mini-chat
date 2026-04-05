@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.group.mapper.GroupMemberMapper">
+
+    <select id="selectGroupVOByUserId" resultType="com.minichat.group.vo.GroupVO">
+        select
+            g.id,
+            g.group_name,
+            g.avatar,
+            g.announcement,
+            g.creator_id,
+            g.owner_id,
+            g.member_count,
+            g.max_members,
+            g.join_policy,
+            g.invite_policy,
+            g.created_time
+        from group_member gm
+                 left join chat_group g on gm.group_id = g.id
+        where gm.user_id = #{currentUserId}
+                and g.is_deleted = 0
+    </select>
+    <select id="selectLastReadBatch" resultType="com.minichat.group.dto.GroupMemberLastReadDTO">
+        SELECT group_id as groupId, last_read_message_id as lastReadMessageId
+        FROM group_member
+        WHERE user_id = #{currentUserId}
+        AND group_id IN
+        <foreach collection='groupIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
+    </select>
+</mapper>

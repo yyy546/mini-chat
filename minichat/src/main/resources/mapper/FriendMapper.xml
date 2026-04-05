@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.friend.mapper.FriendMapper">
+
+    <select id="selectFriendList" resultType="com.minichat.friend.vo.FriendVO">
+        SELECT f.id, f.user_id, f.friend_id as friendId,
+               CASE WHEN f.remark_name IS NULL OR f.remark_name = '' THEN u.nickname ELSE f.remark_name END as remarkName,
+               f.group_name, f.is_blocked, f.created_time, u.nickname, u.avatar
+        FROM friend f
+                 LEFT JOIN user u ON f.friend_id = u.id
+        WHERE f.user_id = #{currentUserId} AND f.is_deleted = 0
+    </select>
+
+    <select id="selectFriendGroupItemList" resultType="com.minichat.friend.vo.FriendGroupItemVO">
+        select
+            f.friend_id as friendId,
+            u.avatar as friendAvatar,
+            CASE
+                WHEN f.remark_name IS NULL OR f.remark_name = '' THEN u.nickname
+                ELSE f.remark_name
+                END as remarkName,
+            u.nickname as friendNickname,
+            null as onlineStatus
+        from friend f
+                 left join user u on f.friend_id = u.id
+        where f.user_id = #{currentUserId} and f.group_name = #{groupName} AND f.is_deleted = 0
+    </select>
+
+    <select id="selectFriendDetail" resultType="com.minichat.friend.vo.FriendDetailVO">
+        select
+            u.id as friendUserId,
+            u.avatar as friendAvatar,
+            CASE
+                WHEN f.remark_name IS NULL OR f.remark_name = '' THEN u.nickname
+                ELSE f.remark_name
+                END as remarkName,
+            u.nickname as friendNickname,
+            f.group_name as groupName,
+            CASE u.gender
+                WHEN 0 THEN '未知'
+                WHEN 1 THEN '男'
+                WHEN 2 THEN '女'
+                ELSE '未知'
+                END as gender,
+            u.signature as signature
+        from friend f
+                 left join user u on f.friend_id = u.id
+        where f.user_id = #{currentUserId} and f.friend_id = #{friendId} AND f.is_deleted = 0
+    </select>
+
+</mapper>

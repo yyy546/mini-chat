@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.friend.mapper.FriendRequestMapper">
+    <update id="update" parameterType="com.minichat.friend.entity.FriendRequest">
+        update friend_request
+        <trim prefix="set" suffixOverrides=",">
+            <!-- 状态必更新 -->
+            status = #{status},
+            <!-- 有新留言时才更新message -->
+            <if test="message != null">
+                message = #{message},
+            </if>
+            <!-- 重新发送场景：设置了createdTime才更新 -->
+            <if test="createdTime != null">
+                created_time = #{createdTime},
+            </if>
+            <!-- 处理请求场景：设置了processedTime才更新 -->
+            <if test="processedTime != null">
+                processed_time = #{processedTime}
+            </if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <select id="selectReceivedRequests" resultType="com.minichat.friend.vo.FriendRequestVO">
+        select
+            fr.id as requestId,
+            fr.from_user_id as fromUserId,
+            u.nickname as fromUserNickname,
+            u.avatar as fromUserAvatar,
+            fr.message as message,
+            fr.created_time as createdTime,
+            fr.status as status
+        from friend_request fr
+                 left join user u on fr.from_user_id = u.id
+        where fr.to_user_id = #{currentUserId}
+          and fr.status = 0
+        order by fr.created_time desc
+    </select>
+    <select id="selectSentRequests" resultType="com.minichat.friend.vo.SentFriendRequestVO">
+        select
+            fr.id as requestId,
+            fr.to_user_id as toUserId,
+            u.nickname as toUserNickname,
+            u.avatar as toUserAvatar,
+            fr.message as message,
+            fr.created_time as createdTime,
+            fr.status as status
+        from friend_request fr
+                 left join user u on fr.to_user_id = u.id
+        where fr.from_user_id = #{currentUserId}
+        order by fr.created_time desc
+    </select>
+
+</mapper>

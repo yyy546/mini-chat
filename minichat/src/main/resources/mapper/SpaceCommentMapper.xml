@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.space.mapper.SpaceCommentMapper">
+    <delete id="deleteBatchByPostIds">
+        delete from space_comment where post_id in
+        <foreach collection="expirePostIds" item="expirePostId" open="(" separator="," close=")">
+            #{expirePostId}
+        </foreach>
+    </delete>
+
+    <select id="selectLimitListByPostIds" resultType="com.minichat.space.vo.SpaceCommentVO">
+        select sc.id, sc.post_id as postId, sc.publish_id as publishId, sc.content, sc.created_time as createdTime,
+        u.nickname as publishName, u.avatar as publishAvatar
+        from space_comment sc
+        left join user u on sc.publish_id = u.id
+        where sc.post_id in
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+            #{postId}
+        </foreach>
+        and sc.status = 0
+        order by sc.created_time asc
+    </select>
+
+    <select id="selectListByPostId" resultType="com.minichat.space.vo.SpaceCommentVO">
+        select sc.id, sc.post_id as postId, sc.publish_id as publishId, sc.content, sc.created_time as createdTime,
+        u.nickname as publishName, u.avatar as publishAvatar
+        from space_comment sc
+        left join user u on sc.publish_id = u.id
+        where sc.post_id = #{id}
+        and sc.status = 0
+        order by sc.created_time asc
+    </select>
+</mapper>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.minichat.user.mapper.UserMapper">
+    <update id="updateById">
+            UPDATE user
+            <set>
+                <if test="username != null">username = #{username},</if>
+                <if test="nickname != null">nickname = #{nickname},</if>
+                <if test="avatar != null">avatar = #{avatar},</if>
+                <if test="gender != null">gender = #{gender},</if>
+                <if test="signature != null">signature = #{signature},</if>
+                <if test="updatedTime != null">updated_time = #{updatedTime},</if>
+            </set>
+            WHERE id = #{id}
+        </update>
+
+        <select id="searchUsers" resultType="com.minichat.user.vo.UserSearchVO">
+            SELECT id, username, nickname, avatar, status
+            FROM user
+            WHERE (username LIKE CONCAT('%', #{keyword}, '%') OR nickname LIKE CONCAT('%', #{keyword}, '%'))
+            AND id != #{currentUserId}
+        </select>
+    <select id="selectBatchIds" resultType="com.minichat.user.entity.User">
+        SELECT * FROM user WHERE id IN
+        <foreach collection="userIds" item="userId" open="(" close=")" separator=",">
+            #{userId}
+        </foreach>
+    </select>
+</mapper>

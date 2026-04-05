@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-minichat}
+      MYSQL_USER: ${MYSQL_USER:-minichat_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-user_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - minichat-network
+
+  redis:
+    image: redis:7.0
+    container_name: redis
+    restart: always
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - minichat-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-admin_password}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - minichat-network
+
+  elasticsearch:
+    build:
+      context: ./es-docker
+      dockerfile: Dockerfile
+    container_name: elasticsearch
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ports:
+      - "${ES_PORT:-9200}:9200"
+      - "${ES_TRANSPORT_PORT:-9300}:9300"
+    networks:
+      - minichat-network
+
+  kibana:
+    image: kibana:${ES_VERSION:-8.11.1}
+    container_name: kibana
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - I18N_LOCALE=zh-CN
+    networks:
+      - minichat-network
+    depends_on:
+      - elasticsearch
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  es-data:
+
+networks:
+  minichat-network:
+    driver: bridge

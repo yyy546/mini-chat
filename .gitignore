@@ -1,0 +1,53 @@
+# Java相关（编译产物、依赖包）
+*.class
+target/
+*.jar
+*.war
+*.ear
+minichat/target/
+
+# Maven相关（版本控制临时文件）
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+.mvn/
+mvnw
+mvnw.cmd
+
+# Vue相关（依赖、构建产物、环境配置）
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+.env.development.local
+.env.production.local
+minichat-frontend/node_modules/
+minichat-frontend/dist/
+
+# IDE相关（编辑器配置文件）
+.idea/
+.vscode/
+*.swp
+*.swo
+*.log
+*.iml
+*.iws
+*.ipr
+
+# Spring本地敏感配置
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-dev.yml
+**/application-local.yml
+**/application-dev.yml
+.env
+
+# 系统相关
+.DS_Store
+Thumbs.db
+
+bfg.jar
+banned.txt
