@@ -689,96 +689,34 @@ export const useChatStore = defineStore('chat', {
         const key = `private_${otherId}`
         const list = this.messagesByUser[key] || []
 
-        // 检查是否重复消息或需要更新
-        const existingIndex = list.findIndex((msg) => msg.id === uiMsg.id)
-
-        if (existingIndex !== -1) {
-          // 如果消息已存在，更新它 (支持消息撤回等状态更新)
-          const newList = [...list]
-          // 保留一些本地状态 if needed, but mostly overwrite from backend
-          newList[existingIndex] = {
-            ...newList[existingIndex],
-            ...uiMsg,
-            // 确保 type 和 content 被更新
-            type: uiMsg.type,
-            content: uiMsg.content
+        // 步骤1：通过 tempId 精确匹配（优先）
+        if (payload.tempId) {
+          const tempIdx = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
+          if (tempIdx !== -1) {
+            // 替换临时消息为真实消息
+            const newList = [...list]
+            newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
+            this.messagesByUser[key] = newList
+            logger.debug('临时消息已确认为真实消息:', uiMsg.id)
+            return
           }
+        }
+
+        // 步骤2：通过 messageId 精确匹配（服务端生成的唯一ID）
+        const existIdx = list.findIndex((msg) => msg.id === uiMsg.id)
+        if (existIdx !== -1) {
+          // 更新已有消息（如撤回状态变更）
+          const newList = [...list]
+          newList[existIdx] = { ...newList[existIdx], ...uiMsg }
           this.messagesByUser[key] = newList
           logger.debug('更新已有消息:', uiMsg.id)
           return
         }
 
-        // 尝试匹配临时消息（将临时消息转换为真实消息）
-        let tempIndex = -1
-        // 1. 优先尝试通过 tempId 匹配
-        if (payload.tempId) {
-          tempIndex = list.findIndex((msg) => msg.id === payload.tempId || msg.tempId === payload.tempId)
-        }
-        // 2. 如果是自己发送的消息，尝试通过内容和时间模糊匹配
-        if (tempIndex === -1 && payload.senderId === selfId) {
-          tempIndex = list.findIndex((msg) => {
-            // 必须是临时消息
-            if (!String(msg.id).startsWith('temp_')) return false
-            // 类型必须一致
-            if (msg.type !== uiMsg.type) return false
-            // 文本消息匹配内容
-            if (msg.type === 1) {
-              return msg.content === uiMsg.content && Math.abs(msg.timestamp - uiMsg.timestamp) < 5000
-            }
-            // 图片/文件匹配 URL
-            if (msg.type === 2 || msg.type === 3) {
-              return msg.fileUrl === uiMsg.fileUrl
-            }
-            return false
-          })
-        }
-
-        if (tempIndex !== -1) {
-          // 找到了对应的临时消息，直接替换为真实消息
-          const newList = [...list]
-          newList[tempIndex] = {
-            ...newList[tempIndex], // 保留本地的一些属性
-            ...uiMsg, // 覆盖为后端属性
-            id: uiMsg.id, // 关键：更新为真实ID
-            isSending: false,
-            sendError: false
-          }
-          this.messagesByUser[key] = newList
-          logger.debug('临时消息已确认为真实消息:', uiMsg.id)
-          return
-        }
-
-        const isDuplicate = list.some((msg) => {
-          // 通过临时ID去重
-          if (msg.tempId && payload.tempId && msg.tempId === payload.tempId) return true
-          // 对于文件/图片消息，通过fileUrl和timestamp去重
-          if (uiMsg.type === 2 || uiMsg.type === 3) {
-            if (
-              msg.type === uiMsg.type &&
-              msg.fileUrl === uiMsg.fileUrl &&
-              Math.abs(msg.timestamp - uiMsg.timestamp) < 2000
-            ) {
-              return true
-            }
-          } else {
-            // 对于文本消息，通过content和timestamp去重
-            if (msg.content === uiMsg.content && Math.abs(msg.timestamp - uiMsg.timestamp) < 1000) {
-              return true
-            }
-          }
-          return false
-        })
-
-        if (!isDuplicate) {
-          this.messagesByUser[key] = [...list, uiMsg]
-          logger.debug('消息已添加到列表，当前消息数:', this.messagesByUser[key].length)
-
-          // 更新会话列表
-          // 如果是接收到的消息，增加未读数
-          this._updateSession(otherId, ts, isIncoming, false)
-        } else {
-          logger.debug('跳过重复消息')
-        }
+        // 步骤3：未匹配到，添加新消息
+        this.messagesByUser[key] = [...list, uiMsg]
+        logger.debug('消息已添加到列表，当前消息数:', this.messagesByUser[key].length)
+        this._updateSession(otherId, ts, isIncoming, false)
       } catch (e) {
         logger.error('处理收到的消息失败:', e, '原始payload:', payload)
       }
@@ -1106,16 +1044,27 @@ export const useChatStore = defineStore('chat', {
         const key = `group_${groupId}`
         const list = this.messagesByUser[key] || []
 
-        // 检查是否重复消息或需要更新
-        const existingIndex = list.findIndex((msg) => msg.id === uiMsg.id)
+        // 步骤1：通过 tempId 精确匹配（优先）
+        if (payload.tempId) {
+          const tempIdx = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
+          if (tempIdx !== -1) {
+            // 替换临时消息为真实消息
+            const newList = [...list]
+            newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
+            this.messagesByUser[key] = newList
+            logger.debug('群聊临时消息已确认为真实消息:', uiMsg.id)
+            return
+          }
+        }
 
-        if (existingIndex !== -1) {
-          // 如果消息已存在，更新它 (支持消息撤回等状态更新)
+        // 步骤2：通过 messageId 精确匹配（服务端生成的唯一ID）
+        const existIdx = list.findIndex((msg) => msg.id === uiMsg.id)
+        if (existIdx !== -1) {
+          // 更新已有消息（如撤回状态变更）
           const newList = [...list]
-          newList[existingIndex] = {
-            ...newList[existingIndex],
+          newList[existIdx] = {
+            ...newList[existIdx],
             ...uiMsg,
-            // 确保 type 和 content 被更新
             type: uiMsg.type,
             content:
               uiMsg.type === 5
@@ -1130,57 +1079,20 @@ export const useChatStore = defineStore('chat', {
           return
         }
 
-        // 尝试匹配临时消息（将临时消息转换为真实消息）
-        if (payload.tempId) {
-          const tempIndex = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
-          if (tempIndex !== -1) {
-            // 替换临时消息
-            const newList = [...list]
-            newList[tempIndex] = {
-              ...newList[tempIndex],
-              ...uiMsg,
-              id: uiMsg.id, // 关键：更新为真实ID
-              isSending: false,
-              sendError: false
-            }
-            this.messagesByUser[key] = newList
-            logger.debug('群聊临时消息已确认为真实消息:', uiMsg.id)
+        // 步骤3：通过 messageSeq 去重（群聊特有，按序列号精确去重）
+        if (uiMsg.messageSeq) {
+          const seqDup = list.some((msg) => msg.messageSeq === uiMsg.messageSeq)
+          if (seqDup) {
+            logger.debug('跳过重复的群聊消息 (messageSeq):', uiMsg.messageSeq)
             return
           }
         }
 
-        const isDuplicate = list.some((msg) => {
-          // 通过消息序号去重（群聊特有）
-          if (uiMsg.messageSeq && msg.messageSeq && msg.messageSeq === uiMsg.messageSeq) return true
-          // 对于文件/图片消息，通过fileUrl和timestamp去重
-          if (uiMsg.type === 2 || uiMsg.type === 3) {
-            if (
-              msg.type === uiMsg.type &&
-              msg.fileUrl === uiMsg.fileUrl &&
-              Math.abs(msg.timestamp - uiMsg.timestamp) < 2000
-            ) {
-              return true
-            }
-          } else {
-            // 对于文本消息，通过content和timestamp去重
-            if (msg.content === uiMsg.content && Math.abs(msg.timestamp - uiMsg.timestamp) < 1000) {
-              return true
-            }
-          }
-          return false
-        })
-
-        if (!isDuplicate) {
-          this.messagesByUser[key] = [...list, uiMsg]
-          logger.debug('群聊消息已添加到列表，当前消息数:', this.messagesByUser[key].length)
-
-          // 更新会话列表
-          // If message is from self, do not increment unread.
-          const isIncoming = payload.senderId !== selfId
-          this._updateSession(groupId, ts, isIncoming, true)
-        } else {
-          logger.debug('跳过重复的群聊消息')
-        }
+        // 步骤4：未匹配到，添加新消息
+        this.messagesByUser[key] = [...list, uiMsg]
+        logger.debug('群聊消息已添加到列表，当前消息数:', this.messagesByUser[key].length)
+        const isIncoming = payload.senderId !== selfId
+        this._updateSession(groupId, ts, isIncoming, true)
       } catch (e) {
         logger.error('处理群聊消息失败:', e, '原始payload:', payload)
       }
