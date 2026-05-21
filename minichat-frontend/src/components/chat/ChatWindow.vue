@@ -563,14 +563,14 @@ const fetchMembers = async () => {
       getGroupMemberList(props.friend.id)
     ])
 
-    if (profileRes.code === 1) {
-      currentGroup.value = profileRes.data
+    if (profileRes) {
+      currentGroup.value = profileRes
     }
 
-    if (membersRes.code === 1) {
-      memberList.value = membersRes.data
+    if (membersRes) {
+      memberList.value = membersRes
     } else {
-      ElMessage.error(membersRes.msg || '获取成员列表失败')
+      ElMessage.error('获取成员列表失败')
     }
   } catch (e) {
     logger.error(e)
@@ -600,19 +600,13 @@ const handleInvite = async () => {
 
   inviteLoading.value = true
   try {
-    const res = await inviteToGroup({
+    await inviteToGroup({
       groupId: props.friend.id,
       userIds: inviteList.value
     })
-
-    if (res.code === 1) {
-      ElMessage.success('邀请成功')
-      showInviteDialog.value = false
-      // 刷新成员列表
-      fetchMembers()
-    } else {
-      ElMessage.error(res.msg || '邀请失败')
-    }
+    ElMessage.success('邀请成功')
+    showInviteDialog.value = false
+    fetchMembers()
   } catch (e) {
     ElMessage.error('邀请出错')
   } finally {
@@ -639,18 +633,13 @@ const handleRemoveMember = async () => {
 
   removeLoading.value = true
   try {
-    const res = await removeGroupMember({
+    await removeGroupMember({
       groupId: props.friend.id,
       userId: removeList.value
     })
-
-    if (res.code === 1) {
-      ElMessage.success('移除成员成功')
-      showRemoveDialog.value = false
-      fetchMembers()
-    } else {
-      ElMessage.error(res.msg || '移除失败')
-    }
+    ElMessage.success('移除成员成功')
+    showRemoveDialog.value = false
+    fetchMembers()
   } catch (e) {
     ElMessage.error('移除出错')
   } finally {
@@ -672,16 +661,10 @@ const handleExitGroup = async () => {
   }
 
   try {
-    const res = await exitGroup(props.friend.id)
-    if (res.code === 1) {
-      ElMessage.success('退出群组成功')
-      showMembersDialog.value = false
-      // 触发外部更新列表或清空当前会话
-      // 这里简单刷新页面或清空当前聊天
-      window.location.reload()
-    } else {
-      ElMessage.error(res.msg || '退出群组失败')
-    }
+    await exitGroup(props.friend.id)
+    ElMessage.success('退出群组成功')
+    showMembersDialog.value = false
+    window.location.reload()
   } catch (e) {
     ElMessage.error('退出群组出错')
   }
@@ -698,18 +681,13 @@ const handleMemberAction = async (command, member) => {
         type: 'info'
       })
 
-      const res = await updateGroupMemberRole({
+      await updateGroupMemberRole({
         groupId: props.friend.id,
         userId: member.userId,
-        role: 1 // 管理员
+        role: 1
       })
-
-      if (res.code === 1) {
-        ElMessage.success('设置管理员成功')
-        fetchMembers()
-      } else {
-        ElMessage.error(res.msg || '操作失败')
-      }
+      ElMessage.success('设置管理员成功')
+      fetchMembers()
     } catch (e) {
       if (e !== 'cancel') ElMessage.error('操作出错')
     }
@@ -721,18 +699,13 @@ const handleMemberAction = async (command, member) => {
         type: 'warning'
       })
 
-      const res = await updateGroupMemberRole({
+      await updateGroupMemberRole({
         groupId: props.friend.id,
         userId: member.userId,
-        role: 0 // 普通成员
+        role: 0
       })
-
-      if (res.code === 1) {
-        ElMessage.success('取消管理员成功')
-        fetchMembers()
-      } else {
-        ElMessage.error(res.msg || '操作失败')
-      }
+      ElMessage.success('取消管理员成功')
+      fetchMembers()
     } catch (e) {
       if (e !== 'cancel') ElMessage.error('操作出错')
     }
@@ -748,18 +721,12 @@ const handleMemberAction = async (command, member) => {
         }
       )
 
-      const res = await transferGroupOwner({
+      await transferGroupOwner({
         groupId: props.friend.id,
         newOwnerId: member.userId
       })
-
-      if (res.code === 1) {
-        ElMessage.success('转让群主成功')
-        fetchMembers()
-        // 可能需要刷新群组信息或页面状态，因为当前用户权限已变
-      } else {
-        ElMessage.error(res.msg || '操作失败')
-      }
+      ElMessage.success('转让群主成功')
+      fetchMembers()
     } catch (e) {
       if (e !== 'cancel') ElMessage.error('操作出错')
     }
@@ -795,11 +762,7 @@ const handleChatSearch = async () => {
     const type = props.friend.type || 0
     const targetId = props.friend.id
     const res = await searchChatMessages(chatSearchKeyword.value, type, targetId)
-    if (res.code === 1) {
-      searchResults.value = res.data
-    } else {
-      ElMessage.error(res.msg || '搜索失败')
-    }
+    searchResults.value = res
   } catch (e) {
     ElMessage.error('搜索出错')
   } finally {

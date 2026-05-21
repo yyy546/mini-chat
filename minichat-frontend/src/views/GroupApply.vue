@@ -223,11 +223,7 @@ const onSearchInput = async () => {
   loading.value = true
   try {
     const res = await searchGroups(k)
-    if (res.code === 1) {
-      results.value = Array.isArray(res.data) ? res.data : []
-    } else {
-      ElMessage.error(res.msg || '搜索群组失败')
-    }
+    results.value = Array.isArray(res) ? res : []
   } catch (e) {
     ElMessage.error('搜索群组出错')
   } finally {
@@ -246,16 +242,12 @@ const confirmApply = async () => {
 
   sending.value = true
   try {
-    const res = await sendGroupRequest({
+    await sendGroupRequest({
       groupId: selectedGroup.value.id,
       message: applyReason.value
     })
-    if (res.code === 1) {
-      ElMessage.success('申请已提交，等待群主/管理员审核')
-      applyDialogVisible.value = false
-    } else {
-      ElMessage.error(res.msg || '申请提交失败')
-    }
+    ElMessage.success('申请已提交，等待群主/管理员审核')
+    applyDialogVisible.value = false
   } catch (e) {
     ElMessage.error('申请提交出错')
   } finally {
@@ -275,11 +267,7 @@ const fetchReceivedRequests = async () => {
   receivedLoading.value = true
   try {
     const res = await getReceivedGroupRequests()
-    if (res.code === 1) {
-      receivedList.value = res.data || []
-    } else {
-      ElMessage.error(res.msg || '获取申请列表失败')
-    }
+    receivedList.value = res || []
   } catch (e) {
     ElMessage.error('获取申请列表出错')
   } finally {
@@ -291,17 +279,13 @@ const handleRequestAction = async (req, status) => {
   if (handling.value) return
   handling.value = true
   try {
-    const res = await handleGroupRequest({
+    await handleGroupRequest({
       groupId: req.groupId,
       applicantId: req.applicantId,
       status: status
     })
-    if (res.code === 1) {
-      ElMessage.success('操作成功')
-      fetchReceivedRequests()
-    } else {
-      ElMessage.error(res.msg || '操作失败')
-    }
+    ElMessage.success('操作成功')
+    fetchReceivedRequests()
   } catch (e) {
     ElMessage.error('操作出错')
   } finally {
@@ -313,11 +297,7 @@ const fetchSentRequests = async () => {
   sentLoading.value = true
   try {
     const res = await getSentGroupRequests()
-    if (res.code === 1) {
-      sentList.value = res.data || []
-    } else {
-      ElMessage.error(res.msg || '获取申请列表失败')
-    }
+    sentList.value = res || []
   } catch (e) {
     ElMessage.error('获取申请列表出错')
   } finally {

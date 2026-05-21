@@ -19,15 +19,6 @@ import { batchCheckUserOnlineStatus } from '../api/userStatus'
 import { useChatStore } from './chat'
 import logger from '../utils/logger'
 
-const unwrap = (res) => {
-  if (Array.isArray(res)) return res
-  if (res && typeof res === 'object') {
-    if (Array.isArray(res.data)) return res.data
-    if (res.data) return res.data
-  }
-  return []
-}
-
 export const useFriendStore = defineStore('friend', {
   state: () => ({
     friends: [],
@@ -45,27 +36,25 @@ export const useFriendStore = defineStore('friend', {
       this.loading = true
       try {
         const res = await getFriendList()
-        const list = unwrap(res) || []
+        const list = Array.isArray(res) ? res : []
         const normalize = (raw) => {
           const friendId = raw.friendId ?? raw.friend_id ?? raw.userId ?? raw.uid
           return {
             ...raw,
             relationId: raw.id,
             friendId: friendId ?? raw.id,
-            id: friendId ?? raw.id, // 统一对外使用 id 为好友的用户ID
-            remark: raw.remark || raw.remarkName, // Ensure remark is mapped
-            online: false // 默认为 false，后续通过 batchCheckUserOnlineStatus 更新
+            id: friendId ?? raw.id,
+            remark: raw.remark || raw.remarkName,
+            online: false
           }
         }
         this.friends = Array.isArray(list) ? list.map(normalize) : []
 
-        // 批量查询好友在线状态
         if (this.friends.length > 0) {
           const ids = this.friends.map((f) => f.id)
           try {
-            const statusRes = await batchCheckUserOnlineStatus(ids)
-            if (statusRes && statusRes.code === 1) {
-              const statusMap = statusRes.data
+            const statusMap = await batchCheckUserOnlineStatus(ids)
+            if (statusMap) {
               this.friends = this.friends.map((f) => ({
                 ...f,
                 online: !!statusMap[f.id]
@@ -86,7 +75,7 @@ export const useFriendStore = defineStore('friend', {
       this.requestLoading = true
       try {
         const res = await getIncomingRequests()
-        this.incomingRequests = res.data
+        this.incomingRequests = res
       } catch (e) {
         ElMessage.error('获取好友申请失败')
       } finally {
@@ -97,7 +86,7 @@ export const useFriendStore = defineStore('friend', {
     async fetchSentRequests() {
       try {
         const res = await getSentRequests()
-        this.sentRequests = res.data
+        this.sentRequests = res
       } catch (e) {
         // 非关键，忽略错误
       }
@@ -130,7 +119,7 @@ export const useFriendStore = defineStore('friend', {
       this.loading = true
       try {
         const res = await searchUsers(keyword)
-        this.searchResults = unwrap(res) || []
+        this.searchResults = Array.isArray(res) ? res : []
       } catch (e) {
         ElMessage.error('搜索用户失败')
       } finally {
@@ -165,7 +154,7 @@ export const useFriendStore = defineStore('friend', {
     async fetchFriendGroups() {
       try {
         const res = await getFriendGroupList()
-        const rawGroups = unwrap(res) || []
+        const rawGroups = Array.isArray(res) ? res : []
         this.groups = rawGroups.map((g) => ({
           ...g,
           items: [],
@@ -180,7 +169,7 @@ export const useFriendStore = defineStore('friend', {
     async fetchGroupItems(groupName) {
       try {
         const res = await getFriendGroupItemList(groupName)
-        const items = unwrap(res) || []
+        const items = Array.isArray(res) ? res : []
         const group = this.groups.find((g) => g.groupName === groupName)
         if (group) {
           group.items = items.map((item) => ({
@@ -222,7 +211,7 @@ export const useFriendStore = defineStore('friend', {
     async fetchFriendDetail(friendId) {
       try {
         const res = await getFriendDetail(friendId)
-        const data = unwrap(res)
+        const data = res
         if (data) {
           this.currentFriendDetail = {
             ...data,

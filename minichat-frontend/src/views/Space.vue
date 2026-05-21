@@ -318,12 +318,9 @@ const fetchPosts = async () => {
     // Modify to call getFeedList as requested
     // lastId use current timestamp, offset default 0
     const res = await getFeedList(Date.now(), 0)
-    if (res.code === 1) {
-      // res.data is ScrollResult { list, minTime, offset }
-      const posts = res.data?.list || []
-      postList.value = posts
-      syncLikedPostMap(posts)
-    }
+    const posts = res?.list || []
+    postList.value = posts
+    syncLikedPostMap(posts)
   } catch (e) {
     logger.error(e)
   } finally {
@@ -355,10 +352,7 @@ const handleToggleLike = async (post) => {
 
   likeLoadingPostId.value = postId
   try {
-    const res = await changeLikeStatus(postId)
-    if (res.code !== 1) {
-      throw new Error(res.msg || '操作失败')
-    }
+    await changeLikeStatus(postId)
     // Success, keep optimistic state
   } catch (e) {
     logger.error(e)
@@ -528,17 +522,11 @@ const handlePublish = async () => {
       content: postContent.value,
       images: imageList.value
     }
-    const res = await publishSpacePost(data)
-    if (res.code === 1) {
-      ElMessage.success('发表成功')
-      // 重置表单
-      postContent.value = ''
-      imageList.value = []
-      // 刷新列表
-      fetchPosts()
-    } else {
-      ElMessage.error(res.msg || '发表失败')
-    }
+    await publishSpacePost(data)
+    ElMessage.success('发表成功')
+    postContent.value = ''
+    imageList.value = []
+    fetchPosts()
   } catch (error) {
     logger.error(error)
     ElMessage.error('发表出错')
@@ -552,10 +540,8 @@ const loadComments = async (post) => {
   try {
     const res = await getSpaceCommentList(postId)
     logger.debug('加载评论结果:', postId, res)
-    if (res.code === 1) {
-      post.comments = res.data || []
-      logger.debug('赋值后的评论:', post.comments)
-    }
+    post.comments = res || []
+    logger.debug('赋值后的评论:', post.comments)
   } catch (e) {
     logger.error('加载评论失败:', e)
   }
@@ -586,15 +572,11 @@ const handlePublishComment = async (post) => {
       publishId: userStore.userInfo?.id,
       content: commentContent.value
     }
-    const res = await publishSpaceComment(data)
-    if (res.code === 1) {
-      ElMessage.success('评论成功')
-      commentContent.value = ''
-      await loadComments(post)
-      post.commentsCount = (post.commentsCount || 0) + 1
-    } else {
-      ElMessage.error(res.msg || '评论失败')
-    }
+    await publishSpaceComment(data)
+    ElMessage.success('评论成功')
+    commentContent.value = ''
+    await loadComments(post)
+    post.commentsCount = (post.commentsCount || 0) + 1
   } catch (e) {
     logger.error(e)
     ElMessage.error('评论出错')
@@ -605,14 +587,10 @@ const handlePublishComment = async (post) => {
 
 const handleDeleteComment = async (commentId, post) => {
   try {
-    const res = await deleteSpaceComment(commentId)
-    if (res.code === 1) {
-      ElMessage.success('删除成功')
-      await loadComments(post)
-      post.commentsCount = Math.max(0, (post.commentsCount || 0) - 1)
-    } else {
-      ElMessage.error(res.msg || '删除失败')
-    }
+    await deleteSpaceComment(commentId)
+    ElMessage.success('删除成功')
+    await loadComments(post)
+    post.commentsCount = Math.max(0, (post.commentsCount || 0) - 1)
   } catch (e) {
     logger.error(e)
     ElMessage.error('删除出错')
@@ -626,18 +604,9 @@ const handleDeletePost = async (postId) => {
   }
   deletingPostId.value = postId
   try {
-    const res = await deleteSpacePost(postId)
-    if (res.code === 1) {
-      ElMessage.success('删除成功')
-      fetchPosts()
-    } else {
-      if (res.msg === '帖子不存在') {
-        ElMessage.error('该动态已不存在，已刷新列表')
-        fetchPosts()
-      } else {
-        ElMessage.error(res.msg || '删除失败')
-      }
-    }
+    await deleteSpacePost(postId)
+    ElMessage.success('删除成功')
+    fetchPosts()
   } catch (e) {
     logger.error(e)
     ElMessage.error('删除出错')
@@ -651,11 +620,7 @@ const fetchDeletedPosts = async () => {
   trashLoading.value = true
   try {
     const res = await getDeletedSpacePostList(userStore.userInfo.id)
-    if (res.code === 1) {
-      deletedPostList.value = res.data || []
-    } else {
-      ElMessage.error(res.msg || '获取回收站失败')
-    }
+    deletedPostList.value = res || []
   } catch (e) {
     logger.error(e)
     ElMessage.error('获取回收站出错')
@@ -676,14 +641,10 @@ const handleRecoverPost = async (postId) => {
   }
   recoveringPostId.value = postId
   try {
-    const res = await recoverSpacePost(postId)
-    if (res.code === 1) {
-      ElMessage.success('恢复成功')
-      await fetchDeletedPosts()
-      fetchPosts()
-    } else {
-      ElMessage.error(res.msg || '恢复失败')
-    }
+    await recoverSpacePost(postId)
+    ElMessage.success('恢复成功')
+    await fetchDeletedPosts()
+    fetchPosts()
   } catch (e) {
     logger.error(e)
     ElMessage.error('恢复出错')

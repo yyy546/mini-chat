@@ -39,8 +39,8 @@ export const useUserStore = defineStore('user', {
       try {
         const response = await login(loginData)
 
-        const token = response.token || response.data?.token
-        const userInfo = response.user || response.data?.user || response.data?.userInfo || response.data?.currentUser
+        const token = response.token
+        const userInfo = response
 
         if (!token) {
           throw new Error('登录失败：未获取到Token')
@@ -102,12 +102,8 @@ export const useUserStore = defineStore('user', {
     },
     async fetchCurrentUser() {
       const res = await getCurrentUser()
-      if (res?.code === 1 && res?.data) {
-        this.userInfo = res.data
-        return res
-      }
-      if (res?.data) {
-        this.userInfo = res.data
+      if (res?.id) {
+        this.userInfo = res
         return res
       }
       throw new Error(res?.msg || '未获取到用户信息')
