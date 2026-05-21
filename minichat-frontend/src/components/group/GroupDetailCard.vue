@@ -13,9 +13,7 @@
           <span class="value">{{ group.id }}</span>
         </div>
         <div class="status-row">
-          <span class="group-text">
-            成员：{{ group.memberCount }} / {{ group.maxMembers }}
-          </span>
+          <span class="group-text"> 成员：{{ group.memberCount }} / {{ group.maxMembers }} </span>
         </div>
       </div>
     </div>
@@ -38,16 +36,14 @@
           <span class="field-value">{{ formatTime(group.createdTime) }}</span>
         </div>
         <div class="field">
-            <span class="field-label">群主 ID</span>
-            <span class="field-value">{{ group.ownerId }}</span>
+          <span class="field-label">群主 ID</span>
+          <span class="field-value">{{ group.ownerId }}</span>
         </div>
       </div>
     </div>
 
     <div class="actions">
-      <el-button type="primary" size="large" @click="$emit('send-message', group)">
-        发送消息
-      </el-button>
+      <el-button type="primary" size="large" @click="$emit('send-message', group)"> 发送消息 </el-button>
     </div>
   </div>
 </template>
@@ -64,7 +60,7 @@ const props = defineProps({
 
 defineEmits(['send-message'])
 
-const getInitial = (name = '') => name ? name.slice(0, 1).toUpperCase() : ''
+const getInitial = (name = '') => (name ? name.slice(0, 1).toUpperCase() : '')
 
 const formatTime = (time) => {
   if (!time) return '-'

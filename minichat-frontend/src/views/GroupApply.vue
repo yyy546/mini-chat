@@ -26,14 +26,21 @@
         </el-tabs>
       </div>
       <div class="main-body">
-        <div v-if="active==='search'" class="search-panel">
-          <el-input v-model="keyword" placeholder="输入群ID/群名称搜索" clearable @input="onSearchInput" size="large" class="panel-search">
+        <div v-if="active === 'search'" class="search-panel">
+          <el-input
+            v-model="keyword"
+            placeholder="输入群ID/群名称搜索"
+            clearable
+            @input="onSearchInput"
+            size="large"
+            class="panel-search"
+          >
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
 
-          <el-skeleton :loading="loading" animated :count="3" style="margin-top:12px">
+          <el-skeleton :loading="loading" animated :count="3" style="margin-top: 12px">
             <template #template>
               <el-skeleton-item variant="text" style="width: 60%" />
               <el-skeleton-item variant="text" style="width: 40%" />
@@ -51,7 +58,13 @@
                     </div>
                   </div>
                   <div class="right">
-                    <el-button size="small" type="primary" @click="openApply(g)" :loading="sending && selectedGroup?.id===g.id">申请加入</el-button>
+                    <el-button
+                      size="small"
+                      type="primary"
+                      @click="openApply(g)"
+                      :loading="sending && selectedGroup?.id === g.id"
+                      >申请加入</el-button
+                    >
                   </div>
                 </el-card>
                 <el-empty v-if="!results.length && keyword" description="未搜索到群组" />
@@ -59,15 +72,17 @@
             </template>
           </el-skeleton>
         </div>
-        
-        <div v-else-if="active==='requests'" class="requests-panel">
+
+        <div v-else-if="active === 'requests'" class="requests-panel">
           <el-skeleton :loading="receivedLoading" animated :count="3">
             <template #default>
               <div v-if="receivedList.length" class="result-list">
                 <el-card v-for="req in receivedList" :key="req.requestId" class="request-card" shadow="hover">
                   <div class="request-content">
                     <div class="request-left">
-                      <el-avatar :size="48" :src="req.applicantAvatar" shape="circle">{{ getInitial(req.applicantName) }}</el-avatar>
+                      <el-avatar :size="48" :src="req.applicantAvatar" shape="circle">{{
+                        getInitial(req.applicantName)
+                      }}</el-avatar>
                     </div>
                     <div class="request-center">
                       <div class="request-header">
@@ -82,11 +97,22 @@
                     </div>
                     <div class="request-right">
                       <div v-if="req.status === 0" class="action-buttons">
-                        <el-button type="primary" size="small" @click="handleRequestAction(req, 1)" :loading="handling">同意</el-button>
-                        <el-button type="danger" size="small" @click="handleRequestAction(req, 2)" :loading="handling" plain>拒绝</el-button>
+                        <el-button type="primary" size="small" @click="handleRequestAction(req, 1)" :loading="handling"
+                          >同意</el-button
+                        >
+                        <el-button
+                          type="danger"
+                          size="small"
+                          @click="handleRequestAction(req, 2)"
+                          :loading="handling"
+                          plain
+                          >拒绝</el-button
+                        >
                       </div>
                       <div v-else class="status-tag">
-                        <el-tag :type="getStatusType(req.status)" effect="light">{{ getStatusText(req.status) }}</el-tag>
+                        <el-tag :type="getStatusType(req.status)" effect="light">{{
+                          getStatusText(req.status)
+                        }}</el-tag>
                       </div>
                     </div>
                   </div>
@@ -96,49 +122,44 @@
             </template>
           </el-skeleton>
         </div>
-        
+
         <div v-else class="sent-panel">
-           <el-skeleton :loading="sentLoading" animated :count="3">
-              <template #default>
-                <div v-if="sentList.length" class="result-list">
-                  <el-card v-for="req in sentList" :key="req.groupId" class="request-card" shadow="hover">
-                     <div class="request-content">
-                        <div class="request-left">
-                          <el-avatar :size="48" :src="req.avatar" shape="circle">{{ getInitial(req.groupName) }}</el-avatar>
-                        </div>
-                        <div class="request-center">
-                          <div class="request-header">
-                            <span class="user-name">{{ req.groupName }}</span>
-                            <span class="action-text">（群ID: {{ req.groupId }}）</span>
-                            <span class="time">{{ formatTime(req.createdTime) }}</span>
-                          </div>
-                          <div class="request-reason" v-if="req.message">
-                            <span class="reason-label">理由：</span>{{ req.message }}
-                          </div>
-                        </div>
-                        <div class="request-right">
-                           <el-tag :type="getStatusType(req.status)" effect="light">{{ getStatusText(req.status) }}</el-tag>
-                        </div>
-                     </div>
-                  </el-card>
-                </div>
-                <el-empty v-else description="暂无发出的申请" />
-              </template>
-           </el-skeleton>
+          <el-skeleton :loading="sentLoading" animated :count="3">
+            <template #default>
+              <div v-if="sentList.length" class="result-list">
+                <el-card v-for="req in sentList" :key="req.groupId" class="request-card" shadow="hover">
+                  <div class="request-content">
+                    <div class="request-left">
+                      <el-avatar :size="48" :src="req.avatar" shape="circle">{{ getInitial(req.groupName) }}</el-avatar>
+                    </div>
+                    <div class="request-center">
+                      <div class="request-header">
+                        <span class="user-name">{{ req.groupName }}</span>
+                        <span class="action-text">（群ID: {{ req.groupId }}）</span>
+                        <span class="time">{{ formatTime(req.createdTime) }}</span>
+                      </div>
+                      <div class="request-reason" v-if="req.message">
+                        <span class="reason-label">理由：</span>{{ req.message }}
+                      </div>
+                    </div>
+                    <div class="request-right">
+                      <el-tag :type="getStatusType(req.status)" effect="light">{{ getStatusText(req.status) }}</el-tag>
+                    </div>
+                  </div>
+                </el-card>
+              </div>
+              <el-empty v-else description="暂无发出的申请" />
+            </template>
+          </el-skeleton>
         </div>
       </div>
     </el-main>
   </el-container>
-  
+
   <!-- 自定义申请弹窗 -->
   <el-dialog v-model="applyDialogVisible" title="申请加入群组" width="400px" destroy-on-close>
     <div style="margin-bottom: 12px">填写验证信息</div>
-    <el-input
-      v-model="applyReason"
-      type="textarea"
-      :rows="4"
-      placeholder="请输入验证信息"
-    />
+    <el-input v-model="applyReason" type="textarea" :rows="4" placeholder="请输入验证信息" />
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="applyDialogVisible = false">取消</el-button>
@@ -154,7 +175,13 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GroupList from '../components/group/GroupList.vue'
-import { searchGroups, sendGroupRequest, getSentGroupRequests, handleGroupRequest, getReceivedGroupRequests } from '../api/group'
+import {
+  searchGroups,
+  sendGroupRequest,
+  getSentGroupRequests,
+  handleGroupRequest,
+  getReceivedGroupRequests
+} from '../api/group'
 import { ArrowLeft, Search } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -185,7 +212,7 @@ const goBack = () => {
 
 const noop = () => {}
 
-const getInitial = (name = '') => name ? name.slice(0, 1).toUpperCase() : '#'
+const getInitial = (name = '') => (name ? name.slice(0, 1).toUpperCase() : '#')
 
 const onSearchInput = async () => {
   const k = keyword.value.trim()
@@ -216,12 +243,12 @@ const openApply = (group) => {
 
 const confirmApply = async () => {
   if (!selectedGroup.value) return
-  
+
   sending.value = true
   try {
-    const res = await sendGroupRequest({ 
-      groupId: selectedGroup.value.id, 
-      message: applyReason.value 
+    const res = await sendGroupRequest({
+      groupId: selectedGroup.value.id,
+      message: applyReason.value
     })
     if (res.code === 1) {
       ElMessage.success('申请已提交，等待群主/管理员审核')
@@ -316,42 +343,166 @@ const formatTime = (timeStr) => {
 </script>
 
 <style scoped>
-.group-page { height: calc(100vh - 20px); background: var(--el-bg-color-page); }
-.sidebar { background: var(--el-bg-color); border-right: 1px solid var(--el-border-color-light); display: flex; flex-direction: column; }
-.sidebar-top { padding: 12px; border-bottom: 1px solid var(--el-border-color-light); display: flex; align-items: center; gap: 8px; }
-.back-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 10px; }
-.back-icon :deep(svg) { font-size: 18px; }
-.back-icon:hover { background: var(--el-fill-color-light); }
-.title { font-weight: 600; color: var(--el-text-color-primary); }
-.sidebar-search { padding: 10px 12px; border-bottom: 1px solid var(--el-border-color-light); }
-.list-search :deep(.el-input__wrapper) { height: 38px; border-radius: 10px; }
-.list-search :deep(.el-input__inner) { font-size: 14px; }
-.main { background: var(--el-bg-color); }
-.main-top { border-bottom: 1px solid var(--el-border-color-light); }
-.main-body { padding: 12px; }
-.search-panel { }
-.panel-search :deep(.el-input__wrapper) { height: 38px; border-radius: 10px; }
-.panel-search :deep(.el-input__inner) { font-size: 14px; }
-.result-list { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
-.result-item { display: flex; align-items: center; }
-.request-card :deep(.el-card__body) { padding: 16px; }
-.request-content { display: flex; align-items: flex-start; gap: 16px; }
-.request-left { flex-shrink: 0; }
-.request-center { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.request-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; line-height: 1.4; }
-.user-name { font-weight: 600; color: var(--el-text-color-primary); font-size: 15px; }
-.action-text { color: var(--el-text-color-secondary); font-size: 13px; }
-.group-name { font-weight: 600; color: var(--el-color-primary); font-size: 14px; }
-.time { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
-.request-reason { background: var(--el-fill-color-lighter); padding: 8px 12px; border-radius: 4px; color: var(--el-text-color-regular); font-size: 13px; line-height: 1.5; }
-.reason-label { color: var(--el-text-color-secondary); }
-.request-right { flex-shrink: 0; display: flex; align-items: center; align-self: center; }
-.action-buttons { display: flex; gap: 8px; }
+.group-page {
+  height: calc(100vh - 20px);
+  background: var(--el-bg-color-page);
+}
+.sidebar {
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-top {
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.back-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.back-icon :deep(svg) {
+  font-size: 18px;
+}
+.back-icon:hover {
+  background: var(--el-fill-color-light);
+}
+.title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.sidebar-search {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+.list-search :deep(.el-input__wrapper) {
+  height: 38px;
+  border-radius: 10px;
+}
+.list-search :deep(.el-input__inner) {
+  font-size: 14px;
+}
+.main {
+  background: var(--el-bg-color);
+}
+.main-top {
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+.main-body {
+  padding: 12px;
+}
+.search-panel {
+}
+.panel-search :deep(.el-input__wrapper) {
+  height: 38px;
+  border-radius: 10px;
+}
+.panel-search :deep(.el-input__inner) {
+  font-size: 14px;
+}
+.result-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.result-item {
+  display: flex;
+  align-items: center;
+}
+.request-card :deep(.el-card__body) {
+  padding: 16px;
+}
+.request-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.request-left {
+  flex-shrink: 0;
+}
+.request-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.request-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  line-height: 1.4;
+}
+.user-name {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+}
+.action-text {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.group-name {
+  font-weight: 600;
+  color: var(--el-color-primary);
+  font-size: 14px;
+}
+.time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.request-reason {
+  background: var(--el-fill-color-lighter);
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.reason-label {
+  color: var(--el-text-color-secondary);
+}
+.request-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  align-self: center;
+}
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
 
-.left { display: flex; align-items: center; gap: 10px; }
-.avatar-wrap { }
-.info .name { font-size: 14px; color: var(--el-text-color-primary); }
-.info .sub { font-size: 12px; color: var(--el-text-color-secondary); }
-.right { margin-left: auto; }
-.placeholder { padding: 24px; }
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.avatar-wrap {
+}
+.info .name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+.info .sub {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.right {
+  margin-left: auto;
+}
+.placeholder {
+  padding: 24px;
+}
 </style>

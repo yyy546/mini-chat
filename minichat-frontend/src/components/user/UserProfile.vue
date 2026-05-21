@@ -1,18 +1,6 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    title="修改个人资料"
-    width="500px"
-    :before-close="handleClose"
-    destroy-on-close
-  >
-    <el-form
-      ref="formRef"
-      :model="form"
-      :rules="rules"
-      label-width="80px"
-      v-loading="loading"
-    >
+  <el-dialog v-model="visible" title="修改个人资料" width="500px" :before-close="handleClose" destroy-on-close>
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="80px" v-loading="loading">
       <div class="avatar-container">
         <div class="avatar-wrapper" @click="triggerFileSelect">
           <el-avatar :size="80" :src="form.avatar" />
@@ -20,19 +8,13 @@
             <el-icon><Camera /></el-icon>
           </div>
         </div>
-        <input 
-          type="file" 
-          ref="fileInput" 
-          style="display: none" 
-          accept="image/*"
-          @change="handleFileChange"
-        >
+        <input type="file" ref="fileInput" style="display: none" accept="image/*" @change="handleFileChange" />
       </div>
 
       <el-form-item label="昵称" prop="nickname">
         <el-input v-model="form.nickname" placeholder="请输入昵称" />
       </el-form-item>
-      
+
       <el-form-item label="性别" prop="gender">
         <el-radio-group v-model="form.gender">
           <el-radio label="未知">未知</el-radio>
@@ -42,20 +24,13 @@
       </el-form-item>
 
       <el-form-item label="个性签名" prop="signature">
-        <el-input 
-          v-model="form.signature" 
-          type="textarea" 
-          :rows="3"
-          placeholder="请输入个性签名" 
-        />
+        <el-input v-model="form.signature" type="textarea" :rows="3" placeholder="请输入个性签名" />
       </el-form-item>
     </el-form>
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
-          提交
-        </el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting"> 提交 </el-button>
       </span>
     </template>
   </el-dialog>
@@ -68,6 +43,7 @@ import { uploadFileUnified } from '../../api/upload'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../store/user'
 import { Camera } from '@element-plus/icons-vue'
+import logger from '../../utils/logger'
 
 const props = defineProps({
   modelValue: Boolean
@@ -97,12 +73,15 @@ const form = reactive({
   avatar: ''
 })
 
-watch(() => props.modelValue, (val) => {
-  visible.value = val
-  if (val) {
-    fetchData()
+watch(
+  () => props.modelValue,
+  (val) => {
+    visible.value = val
+    if (val) {
+      fetchData()
+    }
   }
-})
+)
 
 watch(visible, (val) => {
   emit('update:modelValue', val)
@@ -121,7 +100,7 @@ const fetchData = async () => {
       })
     }
   } catch (e) {
-    console.error('获取个人资料失败', e)
+    logger.error('获取个人资料失败', e)
     ElMessage.error('获取个人资料失败')
   } finally {
     loading.value = false
@@ -139,7 +118,7 @@ const triggerFileSelect = () => {
 const handleFileChange = (e) => {
   const file = e.target.files[0]
   if (!file) return
-  
+
   // 限制文件大小 (例如 2MB)
   if (file.size > 2 * 1024 * 1024) {
     ElMessage.warning('图片大小不能超过 2MB')
@@ -156,7 +135,7 @@ const handleFileChange = (e) => {
 
 const handleSubmit = async () => {
   if (!formRef.value) return
-  
+
   await formRef.value.validate(async (valid, fields) => {
     if (valid) {
       submitting.value = true
@@ -172,7 +151,7 @@ const handleSubmit = async () => {
         }
 
         if (avatarUrl && avatarUrl.startsWith('data:image')) {
-             avatarUrl = '' 
+          avatarUrl = ''
         }
 
         // 2. 构造更新DTO
@@ -196,13 +175,13 @@ const handleSubmit = async () => {
           ElMessage.error(res.msg || '修改失败')
         }
       } catch (e) {
-        console.error('修改个人资料失败', e)
+        logger.error('修改个人资料失败', e)
         ElMessage.error('修改个人资料失败')
       } finally {
         submitting.value = false
       }
     } else {
-      console.log('表单校验失败', fields)
+      logger.debug('表单校验失败', fields)
     }
   })
 }

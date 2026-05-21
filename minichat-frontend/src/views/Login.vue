@@ -4,33 +4,21 @@
       <h2>MiniChat</h2>
       <el-form :model="loginForm" :rules="loginRules" ref="loginFormRef">
         <el-form-item prop="username">
-          <el-input
-              v-model="loginForm.username"
-              placeholder="请输入用户名"
-              prefix-icon="User"
-              clearable
-          />
+          <el-input v-model="loginForm.username" placeholder="请输入用户名" prefix-icon="User" clearable />
         </el-form-item>
 
         <el-form-item prop="password">
           <el-input
-              v-model="loginForm.password"
-              type="password"
-              placeholder="请输入密码"
-              prefix-icon="Lock"
-              show-password
+            v-model="loginForm.password"
+            type="password"
+            placeholder="请输入密码"
+            prefix-icon="Lock"
+            show-password
           />
         </el-form-item>
 
         <el-form-item>
-          <el-button
-              type="primary"
-              style="width: 100%"
-              :loading="loading"
-              @click="handleLogin"
-          >
-            登录
-          </el-button>
+          <el-button type="primary" style="width: 100%" :loading="loading" @click="handleLogin"> 登录 </el-button>
         </el-form-item>
       </el-form>
 
@@ -46,6 +34,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
+import logger from '../utils/logger'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -79,7 +68,7 @@ const handleLogin = async () => {
     await userStore.userLogin(loginForm)
     router.push('/')
   } catch (error) {
-    console.error('登录失败:', error)
+    logger.error('登录失败:', error)
     // 错误信息已经在store中处理并显示
   } finally {
     loading.value = false
@@ -93,9 +82,7 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background:
-      linear-gradient(transparent, white 50%),
-      linear-gradient(#D9F1FF, #F5F1FF);
+  background: linear-gradient(transparent, white 50%), linear-gradient(#d9f1ff, #f5f1ff);
 }
 
 .login-card {

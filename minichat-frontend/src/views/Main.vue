@@ -1,23 +1,29 @@
 <template>
   <el-container class="main-page">
-    <el-aside :width="activeTab==='space' ? '64px' : '360px'" class="sidebar">
+    <el-aside :width="activeTab === 'space' ? '64px' : '360px'" class="sidebar">
       <div class="sidebar-inner">
         <div class="rail">
-          <div class="rail-avatar" @click="showProfile=true">
+          <div class="rail-avatar" @click="showProfile = true">
             <el-avatar :size="40" :src="userStore.userInfo?.avatar">
-              {{ (userStore.userInfo?.nickname || userStore.userInfo?.username || '').slice(0,1).toUpperCase() }}
+              {{ (userStore.userInfo?.nickname || userStore.userInfo?.username || '').slice(0, 1).toUpperCase() }}
             </el-avatar>
           </div>
-          <div :class="['rail-item', activeTab==='message' && 'active']" @click="activeTab='message'">
-            <el-tooltip content="消息" placement="right"><el-icon><ChatLineSquare /></el-icon></el-tooltip>
+          <div :class="['rail-item', activeTab === 'message' && 'active']" @click="activeTab = 'message'">
+            <el-tooltip content="消息" placement="right"
+              ><el-icon><ChatLineSquare /></el-icon
+            ></el-tooltip>
           </div>
-          <div :class="['rail-item', activeTab==='contacts' && 'active']" @click="activeTab='contacts'">
-            <el-tooltip content="联系人" placement="right"><el-icon><User /></el-icon></el-tooltip>
+          <div :class="['rail-item', activeTab === 'contacts' && 'active']" @click="activeTab = 'contacts'">
+            <el-tooltip content="联系人" placement="right"
+              ><el-icon><User /></el-icon
+            ></el-tooltip>
           </div>
-          <div :class="['rail-item', activeTab==='space' && 'active']" @click="activeTab='space'">
-            <el-tooltip content="空间" placement="right"><el-icon><Compass /></el-icon></el-tooltip>
+          <div :class="['rail-item', activeTab === 'space' && 'active']" @click="activeTab = 'space'">
+            <el-tooltip content="空间" placement="right"
+              ><el-icon><Compass /></el-icon
+            ></el-tooltip>
           </div>
-          <div style="flex:1"></div>
+          <div style="flex: 1"></div>
           <div class="rail-item" @click="toggleTheme">
             <el-tooltip :content="isDark ? '切换亮色' : '切换深色'" placement="right">
               <el-icon v-if="isDark"><Sunny /></el-icon>
@@ -44,7 +50,7 @@
             </template>
           </el-dropdown>
         </div>
-        <div class="list" v-if="activeTab!=='space'">
+        <div class="list" v-if="activeTab !== 'space'">
           <div class="sidebar-top">
             <div class="search-row">
               <el-input v-model="filter" :placeholder="placeholderByTab" clearable size="large" class="top-search">
@@ -75,18 +81,25 @@
               </el-dropdown>
             </div>
           </div>
-          <template v-if="activeTab==='message'">
-            <FriendList :friends="filteredList" :active-id="active?.id" :active-type="active?.type" @select="onSelect" />
+          <template v-if="activeTab === 'message'">
+            <FriendList
+              :friends="filteredList"
+              :active-id="active?.id"
+              :active-type="active?.type"
+              @select="onSelect"
+            />
           </template>
-          <template v-else-if="activeTab==='contacts'">
-             <div class="contact-tabs">
-                <div class="tab-item" :class="{active: contactTab==='friend'}" @click="contactTab='friend'">好友</div>
-                <div class="tab-item" :class="{active: contactTab==='group'}" @click="contactTab='group'">群聊</div>
-             </div>
-             <div class="contact-list-wrap">
-               <FriendGroupList v-if="contactTab==='friend'" :show-search="false" @select="onContactSelect" />
-               <GroupList v-else :active-id="selectedGroupId" :filter-text="filter" @select="onGroupSelect" />
-             </div>
+          <template v-else-if="activeTab === 'contacts'">
+            <div class="contact-tabs">
+              <div class="tab-item" :class="{ active: contactTab === 'friend' }" @click="contactTab = 'friend'">
+                好友
+              </div>
+              <div class="tab-item" :class="{ active: contactTab === 'group' }" @click="contactTab = 'group'">群聊</div>
+            </div>
+            <div class="contact-list-wrap">
+              <FriendGroupList v-if="contactTab === 'friend'" :show-search="false" @select="onContactSelect" />
+              <GroupList v-else :active-id="selectedGroupId" :filter-text="filter" @select="onGroupSelect" />
+            </div>
           </template>
           <template v-else>
             <div class="space-placeholder">
@@ -106,7 +119,7 @@
         <GroupDetail v-else :group-id="selectedGroupId" @message="onSendMessage" />
       </template>
       <template v-else>
-         <Space />
+        <Space />
       </template>
     </el-main>
 
@@ -177,12 +190,7 @@ const toggleTheme = () => {
 const findFriendById = (id) => {
   if (!id) return null
   const list = friendStore.friends || []
-  const target = list.find(
-    (f) =>
-      f.id == id ||
-      f.friendId == id ||
-      f.userId == id
-  )
+  const target = list.find((f) => f.id == id || f.friendId == id || f.userId == id)
   return target || null
 }
 
@@ -208,10 +216,7 @@ onMounted(async () => {
   applyTheme(resolveInitialTheme(userStore.userId))
 
   try {
-    await Promise.all([
-      friendStore.fetchFriends(),
-      chatStore.fetchSessions()
-    ])
+    await Promise.all([friendStore.fetchFriends(), chatStore.fetchSessions()])
   } catch (e) {
     await chatStore.fetchSessions()
   }
@@ -295,12 +300,13 @@ const listByTab = computed(() => {
 const filteredList = computed(() => {
   if (!filter.value) return listByTab.value
   const k = filter.value.toLowerCase()
-  return listByTab.value.filter((f) => (
-    (f.name || '').toLowerCase().includes(k) ||
-    (f.nickname || '').toLowerCase().includes(k) ||
-    (f.username || '').toLowerCase().includes(k) ||
-    (f.remark || '').toLowerCase().includes(k)
-  ))
+  return listByTab.value.filter(
+    (f) =>
+      (f.name || '').toLowerCase().includes(k) ||
+      (f.nickname || '').toLowerCase().includes(k) ||
+      (f.username || '').toLowerCase().includes(k) ||
+      (f.remark || '').toLowerCase().includes(k)
+  )
 })
 
 const placeholderByTab = computed(() => {
@@ -344,10 +350,10 @@ const onGroupCreated = async (newGroup) => {
 const onOpenProfile = (info) => {
   // 1. 切换到联系人 Tab
   activeTab.value = 'contacts'
-  
+
   // 2. 切换到对应的子 Tab (friend/group)
   contactTab.value = info.type
-  
+
   // 3. 选中对应的联系人或群组
   if (info.type === 'friend') {
     selectedContactId.value = info.id
@@ -367,23 +373,90 @@ watch(activeTab, async (newTab) => {
 </script>
 
 <style scoped>
-.main-page { height: calc(100vh - 20px); background: var(--el-bg-color-page); }
-.sidebar { background: var(--el-bg-color); border-right: 1px solid var(--el-border-color-light); display: flex; }
-.sidebar-inner { display: flex; width: 100%; height: 100%; }
-.rail { width: 64px; border-right: 1px solid var(--el-border-color-light); display: flex; flex-direction: column; align-items: center; padding-top: 8px; gap: 8px; }
-.rail-avatar { margin-bottom: 4px; cursor: pointer; transition: opacity 0.2s; }
-.rail-avatar:hover { opacity: 0.8; }
-.rail-item { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; color: var(--el-text-color-regular); }
-.rail-item.active, .rail-item:hover { background: var(--el-fill-color-light); color: var(--el-color-primary); }
-.list { flex: 1; display: flex; flex-direction: column; }
-.sidebar-top { padding: 10px; border-bottom: 1px solid var(--el-border-color-light); }
-.search-row { display: flex; align-items: center; gap: 8px; }
-.top-search { flex: 1; }
-.top-search :deep(.el-input__wrapper) { height: 40px; border-radius: 10px; }
-.top-search :deep(.el-input__inner) { font-size: 14px; }
-.quick-btn { width: 40px; height: 40px; border-radius: 10px; }
-.space-placeholder { padding: 12px; }
-.chat { background: var(--el-bg-color); height: 100%; overflow: hidden; padding: 0; }
+.main-page {
+  height: calc(100vh - 20px);
+  background: var(--el-bg-color-page);
+}
+.sidebar {
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+}
+.sidebar-inner {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+.rail {
+  width: 64px;
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  gap: 8px;
+}
+.rail-avatar {
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.rail-avatar:hover {
+  opacity: 0.8;
+}
+.rail-item {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--el-text-color-regular);
+}
+.rail-item.active,
+.rail-item:hover {
+  background: var(--el-fill-color-light);
+  color: var(--el-color-primary);
+}
+.list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-top {
+  padding: 10px;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-search {
+  flex: 1;
+}
+.top-search :deep(.el-input__wrapper) {
+  height: 40px;
+  border-radius: 10px;
+}
+.top-search :deep(.el-input__inner) {
+  font-size: 14px;
+}
+.quick-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.space-placeholder {
+  padding: 12px;
+}
+.chat {
+  background: var(--el-bg-color);
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+}
 .contact-tabs {
   display: flex;
   background: var(--el-bg-color-page);
@@ -405,11 +478,11 @@ watch(activeTab, async (newTab) => {
   background: var(--el-bg-color);
   color: var(--el-color-primary);
   font-weight: 500;
-   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
- }
- .contact-list-wrap {
-   flex: 1;
-   overflow: hidden;
-   position: relative;
- }
- </style>
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.contact-list-wrap {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+</style>

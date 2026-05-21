@@ -1,5 +1,5 @@
 <template>
-  <div style="padding: 20px;">
+  <div style="padding: 20px">
     <h1>MiniChat 首页</h1>
     <div v-if="userStore.userInfo">
       <p>欢迎，{{ userStore.userInfo.nickname || userStore.userInfo.username }}！</p>
@@ -14,6 +14,7 @@
 import { onMounted } from 'vue'
 import { useUserStore } from '../store/user'
 import { useRouter } from 'vue-router'
+import logger from '../utils/logger'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -28,7 +29,7 @@ onMounted(async () => {
     try {
       await userStore.fetchCurrentUser()
     } catch (error) {
-      console.error('获取用户信息失败:', error)
+      logger.error('获取用户信息失败:', error)
     }
   }
 })

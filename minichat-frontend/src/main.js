@@ -21,7 +21,7 @@ app.use(ElementPlus)
 
 // 3. 全局注册所有图标（保留原有逻辑）
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    app.component(key, component)
+  app.component(key, component)
 }
 
 // 4. 恢复用户信息（若存在Token）

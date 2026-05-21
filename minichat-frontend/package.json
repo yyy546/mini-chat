@@ -9,7 +9,11 @@
     "dev:8081": "vite --host --mode dev8081 --port 5174",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rimraf dist .vite"
+    "clean": "rimraf dist .vite",
+    "lint": "eslint . --ext .js,.vue --fix",
+    "format": "prettier --write \"src/**/*.{js,vue,css,json}\"",
+    "lint:check": "eslint . --ext .js,.vue",
+    "format:check": "prettier --check \"src/**/*.{js,vue,css,json}\""
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -22,7 +26,13 @@
     "vue-router": "^4.6.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^6.0.1",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.9.1",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
     "rimraf": "^6.1.2",
     "vite": "^7.1.7"
   }

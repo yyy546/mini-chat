@@ -19,9 +19,7 @@
           <span class="status-dot" :class="{ online: friend.online }"></span>
           <span class="status-text">{{ friend.online ? '在线' : '离线' }}</span>
           <span class="divider">|</span>
-          <span class="group-text">
-            分组：{{ friend.groupName || '我的好友' }}
-          </span>
+          <span class="group-text"> 分组：{{ friend.groupName || '我的好友' }} </span>
         </div>
       </div>
     </div>
@@ -55,12 +53,8 @@
     </div>
 
     <div class="actions">
-      <el-button type="primary" size="large" @click="$emit('send-message', friend)">
-        发送消息
-      </el-button>
-      <el-button type="danger" size="large" plain @click="$emit('delete-friend', friend)">
-        删除好友
-      </el-button>
+      <el-button type="primary" size="large" @click="$emit('send-message', friend)"> 发送消息 </el-button>
+      <el-button type="danger" size="large" plain @click="$emit('delete-friend', friend)"> 删除好友 </el-button>
     </div>
   </div>
 </template>
@@ -212,5 +206,3 @@ const getInitial = (name = '') => name.slice(0, 1).toUpperCase()
   min-width: 120px;
 }
 </style>
-
-

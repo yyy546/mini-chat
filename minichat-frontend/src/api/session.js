@@ -4,4 +4,3 @@ import request from '../utils/request'
 export const getSessionList = () => {
   return request.get('/session/list')
 }
-
