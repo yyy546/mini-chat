@@ -1,54 +1,20 @@
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import {
-  getChatHistory,
-  getGroupChatHistory,
-  markMessagesAsRead,
-  markGroupMessageRead,
-  recallPrivateMessage,
-  recallGroupMessage,
-  getGroupMessageHistory,
-  getPrivateMessageHistory
-} from '../api/chat'
+import { markMessagesAsRead, markGroupMessageRead, getGroupMessageHistory, getPrivateMessageHistory } from '../api/chat'
 import { getSessionList } from '../api/session'
 import { getFriendList } from '../api/friend'
-import Stomp from 'stompjs'
-import SockJS from 'sockjs-client'
 import { useUserStore } from './user'
-import { useFriendStore } from './friend'
-import request from '../utils/request'
+import { useWebSocketStore } from './chat/useWebSocketStore'
+import { useMessageActions } from './chat/useMessageActions'
 import logger from '../utils/logger'
-
-const sockPath = '/api/minichat-websocket'
-
-const getWebSocketUrl = (token) => {
-  const apiBase = import.meta.env.VITE_API_BASE || ''
-  const wsBase = import.meta.env.VITE_WS_BASE
-  if (wsBase) {
-    const url = wsBase
-    return token ? `${url}?token=${encodeURIComponent(token)}` : url
-  }
-  // 使用相对路径，让浏览器自动处理协议和端口（http -> ws, https -> wss）
-  // 这样请求就会发送到当前页面的端口（8090），并由 Nginx 转发
-  const path = sockPath
-  return token ? `${path}?token=${encodeURIComponent(token)}` : path
-}
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
     activeUser: null,
-    messagesByUser: {}, // 存储消息，key格式: "private_{id}" 或 "group_{id}"
-    chatPagination: {}, // 存储分页信息，key同上: { page: 1, hasMore: true, loading: false }
-    sessions: [], // 会话列表（包含好友和群聊）
-    sessionLoading: false,
-    stomp: null,
-    connecting: false,
-    connected: false,
-    connectionError: null,
-    subscriptions: new Map(), // 添加订阅管理
-    groupSubscriptions: new Map(), // 群聊订阅管理，key为groupId
-    heartbeatTimer: null, // 心跳定时器
-    heartbeatCount: 0 // 心跳计数器
+    messagesByUser: {},
+    chatPagination: {},
+    sessions: [],
+    sessionLoading: false
   }),
 
   getters: {
@@ -60,20 +26,21 @@ export const useChatStore = defineStore('chat', {
       return state.messagesByUser[key] || []
     },
 
-    isConnected(state) {
-      return state.connected && state.stomp && state.stomp.connected
+    isConnected() {
+      const wsStore = useWebSocketStore()
+      return wsStore.connected && wsStore.stomp && wsStore.stomp.connected
     }
   },
 
   actions: {
-    // 获取会话列表
+    // ---- 会话管理 ----
+
     async fetchSessions() {
       this.sessionLoading = true
       try {
         let list = await getSessionList()
         list = Array.isArray(list) ? list : []
 
-        // 获取好友列表，用于过滤已删除的好友
         try {
           const friendList = await getFriendList()
           const validFriendIds = new Set()
@@ -81,19 +48,16 @@ export const useChatStore = defineStore('chat', {
             const friendId = friend.friendId ?? friend.friend_id ?? friend.userId ?? friend.id
             if (friendId) {
               validFriendIds.add(friendId)
-              validFriendIds.add(String(friendId)) // 同时添加字符串形式，以防ID类型不一致
-              validFriendIds.add(Number(friendId)) // 同时添加数字形式
+              validFriendIds.add(String(friendId))
+              validFriendIds.add(Number(friendId))
             }
           })
 
-          // 过滤会话列表：只保留群聊（type=1）或未删除的好友的私聊（type=0且在好友列表中）
           list = list.filter((session) => {
             const sessionType = session.type || 0
-            // 群聊直接保留
             if (sessionType === 1) {
               return true
             }
-            // 私聊需要检查是否在好友列表中
             const sessionId = session.id
             return (
               validFriendIds.has(sessionId) ||
@@ -103,15 +67,13 @@ export const useChatStore = defineStore('chat', {
           })
         } catch (friendErr) {
           logger.warn('获取好友列表失败，将显示所有会话:', friendErr)
-          // 如果获取好友列表失败，仍然显示所有会话，但记录警告
         }
 
-        // 转换时间格式并排序
         this.sessions = list
           .map((session) => ({
             ...session,
             id: session.id,
-            type: session.type || 0, // 0:私聊, 1:群聊
+            type: session.type || 0,
             name: session.name || '',
             avatar: session.avatar || '',
             lastMessageTime: session.lastMessageTime ? new Date(session.lastMessageTime).getTime() : 0,
@@ -119,9 +81,9 @@ export const useChatStore = defineStore('chat', {
           }))
           .sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
 
-        // 如果 WebSocket 已连接，订阅所有群聊
-        if (this.isConnected) {
-          this._subscribeAllGroups()
+        const wsStore = useWebSocketStore()
+        if (wsStore.isConnected) {
+          wsStore._subscribeAllGroups()
         }
       } catch (e) {
         logger.error('获取会话列表失败:', e)
@@ -136,23 +98,18 @@ export const useChatStore = defineStore('chat', {
       this.activeUser = user
       if (!user) return
       const id = user.id
-      const sessionType = user.type || 0 // 0:私聊, 1:群聊
+      const sessionType = user.type || 0
       const key = `${sessionType === 1 ? 'group' : 'private'}_${id}`
 
-      // Reset pagination
       this.chatPagination[key] = { page: 1, hasMore: true, loading: false }
 
-      // 如果是群聊，确保订阅了该群聊
+      const wsStore = useWebSocketStore()
       if (sessionType === 1) {
-        this._subscribeGroup(id)
-        // 始终加载最新历史消息，确保数据同步
+        wsStore._subscribeGroup(id)
         await this.loadHistory(id, sessionType)
-        // 标记已读
         this.markAsRead(id, 1)
       } else if (sessionType === 0) {
-        // 私聊：始终加载最新历史消息
         await this.loadHistory(id, sessionType)
-        // 标记已读
         this.markAsRead(id, 0)
       }
     },
@@ -160,18 +117,20 @@ export const useChatStore = defineStore('chat', {
     async markAsRead(targetId, type = 0) {
       if (!targetId) return
       try {
-        // 调用后端接口标记消息为已读
         if (type === 1) {
           await markGroupMessageRead(targetId)
         } else {
-          // 参数 receiverId 指的是消息的发送者（即当前聊天对象），因为对于他发的消息，我是接收者
           await markMessagesAsRead(targetId)
         }
 
-        // 更新本地会话的未读数
-        const session = this.sessions.find((s) => s.id === targetId && (s.type || 0) === type)
-        if (session) {
-          session.unreadCount = 0
+        const sessionIndex = this.sessions.findIndex((s) => s.id == targetId && (s.type || 0) === type)
+        if (sessionIndex !== -1) {
+          const session = this.sessions[sessionIndex]
+          this.sessions[sessionIndex] = {
+            ...session,
+            unreadCount: 0,
+            lastReadSeq: type === 1 ? session.lastMessageSeq || session.lastReadSeq || 0 : session.lastReadSeq
+          }
         }
 
         logger.debug('已标记消息为已读，对象ID:', targetId, '类型:', type)
@@ -185,21 +144,17 @@ export const useChatStore = defineStore('chat', {
       const selfId = userStore.userInfo?.id
       const key = `${sessionType === 1 ? 'group' : 'private'}_${userId}`
 
-      // 初始化分页信息
       if (!this.chatPagination[key]) {
         this.chatPagination[key] = { page: 1, hasMore: true, loading: false }
       }
 
       const pagination = this.chatPagination[key]
 
-      // 如果是加载更多但没有更多数据，直接返回
       if (isLoadMore && !pagination.hasMore) return
 
-      // 防止重复加载
       if (pagination.loading) return
       pagination.loading = true
 
-      // 如果是首次加载（非加载更多），重置页码
       if (!isLoadMore) {
         pagination.page = 1
         pagination.hasMore = true
@@ -240,7 +195,6 @@ export const useChatStore = defineStore('chat', {
             senderNickname: m.senderNickname,
             messageSeq: m.messageSeq
           }
-          // 特殊处理撤回消息
           if (msgObj.type === 5) {
             msgObj.content =
               msgObj.fromId === 'self'
@@ -253,22 +207,14 @@ export const useChatStore = defineStore('chat', {
           return msgObj
         })
 
-        // 反转数组：后端返回的是 [最新, ..., 较旧]，我们需要 [较旧, ..., 最新]
-        // 实际上后端分页通常是按时间倒序：
-        // Page 1: [Newest Msg 1, Newest Msg 2, ...]
-        // So rawList[0] is the absolute newest.
-        // We want to display in time order (old -> new).
-        // So we reverse it: [..., Newest Msg 2, Newest Msg 1]
         const sortedList = list.reverse()
 
         if (isLoadMore) {
-          // 加载更多（查看历史）：把旧数据拼接到头部
           this.messagesByUser[key] = [...sortedList, ...(this.messagesByUser[key] || [])]
           if (pagination.hasMore) {
             pagination.page += 1
           }
         } else {
-          // 首次加载：覆盖
           this.messagesByUser[key] = sortedList
           if (pagination.hasMore) {
             pagination.page = 2
@@ -284,1010 +230,90 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    connect() {
-      if (this.stomp && this.connected) {
-        logger.debug('WebSocket 已经连接')
-        return
-      }
-
-      if (this.connecting) {
-        logger.debug('WebSocket 正在连接中...')
-        return
-      }
-
-      this.connecting = true
-      this.connectionError = null
-
-      try {
-        const userStore = useUserStore()
-        const token = userStore.token
-
-        logger.debug('开始连接 WebSocket, token:', token ? '有' : '无')
-
-        const url = getWebSocketUrl(token)
-        const ws = new SockJS(url)
-        const client = Stomp.over(ws)
-
-        // 开发阶段打开调试日志
-        client.debug = (msg) => {
-          // 过滤掉心跳包等噪音，只显示重要帧
-          if (
-            msg.startsWith('>>> CONNECT') ||
-            msg.startsWith('<<< CONNECTED') ||
-            msg.startsWith('>>> SUBSCRIBE') ||
-            msg.startsWith('>>> SEND') ||
-            msg.startsWith('<<< MESSAGE') ||
-            msg.startsWith('<<< ERROR')
-          ) {
-            logger.debug('STOMP:', msg)
-          }
-        }
-
-        const headers = {}
-        if (token) {
-          headers.Authorization = token.trim()
-          logger.debug('设置 Authorization 头:', headers.Authorization)
-        }
-
-        client.connect(
-          headers,
-          (frame) => {
-            // 连接成功回调
-            logger.debug('WebSocket 连接成功! Frame:', frame)
-            this.stomp = client
-            this.connecting = false
-            this.connected = true
-            ElMessage.success('连接成功！')
-
-            // 订阅私聊消息
-            const subscription = client.subscribe('/user/queue/private', (message) => {
-              logger.debug('收到 STOMP 消息, headers:', message.headers)
-              logger.debug('收到 STOMP 消息 body:', message.body)
-              try {
-                const result = JSON.parse(message.body)
-                logger.debug('解析后的消息结果:', result)
-
-                // 兼容直接返回消息对象的情况
-                if (result.code === 1) {
-                  this._handleIncoming(result.data)
-                } else if (result.senderId && result.content) {
-                  // 如果没有code但包含消息关键字段，直接视为消息处理
-                  this._handleIncoming(result)
-                } else if (result.msg) {
-                  // 忽略心跳或其他ACK消息
-                  logger.debug('收到系统消息:', result.msg)
-                } else {
-                  logger.warn('收到未知格式响应:', result)
-                }
-              } catch (e) {
-                logger.error('解析消息失败:', e, '原始消息:', message.body)
-                ElMessage.error('消息解析失败')
-              }
-            })
-
-            // 订阅用户在线状态变更
-            const statusSubscription = client.subscribe('/topic/user-status', (message) => {
-              try {
-                const statusDto = JSON.parse(message.body)
-                logger.debug('收到用户状态变更:', statusDto)
-                if (statusDto && statusDto.userId) {
-                  const friendStore = useFriendStore()
-                  friendStore.updateFriendStatus(statusDto.userId, statusDto.isOnline)
-                  logger.debug(`用户 ${statusDto.userId} 状态已更新为: ${statusDto.isOnline ? '在线' : '离线'}`)
-                }
-              } catch (e) {
-                logger.error('解析用户状态消息失败:', e)
-              }
-            })
-
-            // 订阅私聊撤回消息
-            const recallSubscription = client.subscribe('/user/queue/private_recall', (message) => {
-              try {
-                const recallDto = JSON.parse(message.body)
-                this._handleRecallNotification(recallDto)
-              } catch (e) {
-                logger.error('解析撤回消息失败:', e)
-              }
-            })
-
-            // 保存订阅以便后续管理
-            this.subscriptions.set('private', subscription)
-            this.subscriptions.set('status', statusSubscription)
-            this.subscriptions.set('recall', recallSubscription)
-            logger.debug('已订阅 /user/queue/private, /topic/user-status, /user/queue/private_recall')
-
-            // 订阅所有群聊消息（从会话列表中获取群聊ID）
-            this._subscribeAllGroups()
-
-            // WebSocket 连接成功后，立即刷新好友在线状态
-            this._refreshFriendStatus()
-
-            // 测试发送一条连接成功的消息
-            this._sendConnectionTest()
-
-            // 启动心跳
-            this.startHeartbeat()
-          },
-          (error) => {
-            // 连接失败回调
-            logger.error('WebSocket 连接失败:', error)
-
-            // 输出详细的错误信息
-            if (error.headers) {
-              logger.error('错误头信息:', error.headers)
-              if (error.headers.message) {
-                logger.error('错误消息:', error.headers.message)
-              }
-            }
-
-            this.stomp = null
-            this.connecting = false
-            this.connected = false
-
-            let errorMsg = '连接失败'
-            if (error.headers && error.headers.message) {
-              errorMsg += ': ' + error.headers.message
-            } else if (error.message) {
-              errorMsg += ': ' + error.message
-            }
-
-            this.connectionError = errorMsg
-            ElMessage.error(errorMsg)
-          }
-        )
-
-        // 添加连接超时检测
-        setTimeout(() => {
-          if (this.connecting) {
-            logger.warn('WebSocket 连接超时')
-            this.connecting = false
-            this.connectionError = '连接超时'
-            ElMessage.error('连接超时，请检查网络或服务器状态')
-
-            // 尝试断开连接
-            if (client && client.connected) {
-              client.disconnect()
-            }
-          }
-        }, 15000)
-      } catch (e) {
-        logger.error('WebSocket 初始化异常:', e)
-        this.connecting = false
-        this.connectionError = e.message
-        ElMessage.error('初始化失败: ' + e.message)
-      }
-    },
-
-    // 处理撤回通知
-    _handleRecallNotification(payload) {
-      logger.debug('收到撤回通知:', payload)
-      const messageId = payload.messageId
-      if (!messageId) return
-
-      // 查找消息所在的会话
-      // 这里的 chatId 可能是对方 ID（如果是私聊）
-      // 但我们需要更新本地缓存，所以需要遍历或知道是哪个会话
-      // 简单做法：遍历 activeUser 的会话，或者直接根据 ID 查找
-
-      // 由于我们不知道消息在哪个会话列表（虽然 payload.chatId 有提示，但可能是 sender 或 receiver ID）
-      // 我们可以尝试在当前活跃会话中查找，或者遍历所有会话
-
-      // 优化：RecallMessageDTO 包含 chatId，如果是私聊，sender收到的 chatId 是 receiverId，receiver收到的 chatId 是 senderId
-      // 所以我们可以构建 key
-
-      const userStore = useUserStore()
-      const selfId = userStore.userInfo?.id
-
-      let targetUserId
-      if (payload.recallUserId === selfId) {
-        // 是我自己撤回的，消息在 "private_receiverId" 中
-        targetUserId = payload.chatId
-      } else {
-        // 是对方撤回的，消息在 "private_senderId" 中 (即 recallUserId)
-        targetUserId = payload.recallUserId
-      }
-
-      const key = `private_${targetUserId}`
-      const list = this.messagesByUser[key] || []
-
-      const idx = list.findIndex((m) => m.id === messageId)
-      if (idx !== -1) {
-        const newList = [...list]
-        newList[idx] = {
-          ...newList[idx],
-          content: payload.recallUserId === selfId ? '你撤回了一条消息' : '对方撤回了一条消息',
-          type: 5,
-          recall: true
-        }
-        this.messagesByUser[key] = newList
-        logger.debug('已更新撤回消息状态:', messageId)
-      } else {
-        logger.warn('未找到要撤回的消息:', messageId)
-      }
-    },
-
-    // 发送连接测试消息
-    _sendConnectionTest() {
-      const userStore = useUserStore()
-      const currentUser = userStore.userInfo
-
-      if (currentUser && currentUser.id) {
-        logger.debug('连接测试: 当前用户 ID', currentUser.id)
-        // 这里可以发送一条测试消息，或者只是记录连接状态
-      }
-    },
-
-    // 更新会话列表
-    _updateSession(sessionId, timestamp, incrementUnread = false, isGroup = false) {
+    _updateSession(sessionId, timestamp, incrementUnread = false, isGroup = false, messageSeq = null) {
       const type = isGroup ? 1 : 0
       const sessionIndex = this.sessions.findIndex((s) => s.id == sessionId && (s.type || 0) === type)
 
       if (sessionIndex !== -1) {
         const session = this.sessions[sessionIndex]
+        const isActive = this.activeUser && this.activeUser.id == sessionId && (this.activeUser.type || 0) === type
 
-        // Check if we should increment unread
         let newUnreadCount = session.unreadCount || 0
         if (incrementUnread) {
-          // If active user is this session, don't increment
-          const isActive = this.activeUser && this.activeUser.id == sessionId && (this.activeUser.type || 0) === type
           if (!isActive) {
             newUnreadCount++
           }
         }
 
-        // 只有当时间更新时才重新排序
+        let nextLastMessageSeq = session.lastMessageSeq
+        let nextLastReadSeq = session.lastReadSeq
+        if (isGroup && messageSeq) {
+          nextLastMessageSeq = Math.max(Number(session.lastMessageSeq || 0), Number(messageSeq))
+          if (isActive) {
+            nextLastReadSeq = nextLastMessageSeq
+            newUnreadCount = 0
+          }
+        }
+
         if (!session.lastMessageTime || session.lastMessageTime < timestamp || incrementUnread) {
           this.sessions[sessionIndex] = {
             ...session,
             lastMessageTime: timestamp > (session.lastMessageTime || 0) ? timestamp : session.lastMessageTime,
-            unreadCount: newUnreadCount
+            unreadCount: newUnreadCount,
+            lastMessageSeq: nextLastMessageSeq,
+            lastReadSeq: nextLastReadSeq
           }
-          // 重新排序会话列表
           this.sessions.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
         }
       }
     },
 
-    // 刷新好友在线状态
-    async _refreshFriendStatus() {
-      try {
-        const friendStore = useFriendStore()
-        if (friendStore.friends && friendStore.friends.length > 0) {
-          const ids = friendStore.friends.map((f) => f.id)
-          const { batchCheckUserOnlineStatus } = await import('../api/userStatus')
-          const statusRes = await batchCheckUserOnlineStatus(ids)
-          if (statusRes) {
-            const statusMap = statusRes
-            // 批量更新好友状态
-            friendStore.friends.forEach((friend) => {
-              const isOnline = !!statusMap[friend.id]
-              // 只有当状态真正改变时才更新
-              if (friend.online !== isOnline) {
-                friendStore.updateFriendStatus(friend.id, isOnline)
-              }
-            })
-            logger.debug('好友在线状态已刷新')
-          }
-        }
-      } catch (e) {
-        logger.error('刷新好友在线状态失败:', e)
-      }
+    // ---- 委托给 useMessageActions ----
+
+    sendMessage(toUserId, content, type, fileName, fileSize, fileUrl) {
+      return useMessageActions().sendMessage(toUserId, content, type, fileName, fileSize, fileUrl)
+    },
+
+    sendGroupMessage(groupId, content, type, fileName, fileSize, fileUrl) {
+      return useMessageActions().sendGroupMessage(groupId, content, type, fileName, fileSize, fileUrl)
     },
 
     _handleIncoming(payload) {
-      try {
-        logger.debug('收到WebSocket消息:', payload)
-
-        // 处理发送失败的消息
-        if (payload.error) {
-          logger.warn('处理发送失败消息:', payload)
-          const otherId = payload.receiverId // 接收者ID即为当前聊天对象ID
-          const tempId = payload.tempId
-
-          if (otherId && tempId) {
-            const key = `private_${otherId}`
-            const list = this.messagesByUser[key]
-
-            if (list) {
-              const idx = list.findIndex((m) => m.id == tempId || m.tempId == tempId)
-              if (idx !== -1) {
-                // 更新消息状态为发送失败
-                const newList = [...list]
-                newList[idx] = {
-                  ...newList[idx],
-                  isSending: false,
-                  sendError: true,
-                  errorMessage: payload.errorMessage || '发送失败'
-                }
-                // 强制更新 store 状态
-                this.messagesByUser[key] = newList
-                logger.debug('已标记消息为发送失败, tempId:', tempId)
-              } else {
-                logger.warn('未找到对应的临时消息:', tempId)
-              }
-            } else {
-              logger.warn('未找到对应的会话列表:', otherId)
-            }
-          }
-          return
-        }
-
-        const userStore = useUserStore()
-        const selfId = userStore.userInfo?.id
-
-        if (!selfId) {
-          logger.error('未获取到当前用户信息')
-          ElMessage.error('未获取到当前用户信息，无法接收消息')
-          return
-        }
-
-        // 确定消息来源（对方用户ID）
-        let otherId
-        let isIncoming = false
-        if (payload.senderId === selfId) {
-          // 这是自己发送的消息回执
-          otherId = payload.receiverId
-          logger.debug('收到自己的消息回执，对方 ID:', otherId)
-        } else {
-          // 这是对方发来的消息
-          otherId = payload.senderId
-          isIncoming = true
-          logger.debug('收到对方消息，对方 ID:', otherId)
-        }
-
-        if (!otherId) {
-          logger.error('无法确定消息对方ID:', payload)
-          return
-        }
-
-        // 处理时间戳
-        let ts
-        if (payload.sendTime) {
-          // 尝试多种时间格式解析
-          ts = new Date(payload.sendTime).getTime()
-          if (isNaN(ts)) {
-            // 如果解析失败，使用当前时间
-            ts = Date.now()
-            logger.warn('消息时间格式不正确，使用当前时间:', payload.sendTime)
-          }
-        } else {
-          ts = Date.now()
-          logger.warn('消息缺少 sendTime，使用当前时间')
-        }
-
-        // 构建前端消息对象
-        const uiMsg = {
-          id: payload.messageId || payload.id || `temp_${Date.now()}`,
-          fromId: payload.senderId === selfId ? 'self' : payload.senderId,
-          toId: payload.receiverId,
-          content: payload.content,
-          timestamp: ts,
-          type: payload.messageType || 1,
-          fileName: payload.fileName,
-          fileSize: payload.fileSize,
-          fileUrl: payload.fileUrl,
-          // 保留原始payload用于调试
-          originalPayload: payload,
-          // 添加消息状态
-          isSending: false,
-          isReceived: true,
-          sendError: false
-        }
-
-        // 特殊处理撤回消息的内容展示
-        if (uiMsg.type === 5) {
-          if (uiMsg.fromId === 'self') {
-            uiMsg.content = '你撤回了一条消息'
-          } else {
-            uiMsg.content = '对方撤回了一条消息'
-          }
-        }
-
-        logger.debug('构建的UI消息:', uiMsg)
-
-        // 更新消息列表
-        const key = `private_${otherId}`
-        const list = this.messagesByUser[key] || []
-
-        // 步骤1：通过 tempId 精确匹配（优先）
-        if (payload.tempId) {
-          const tempIdx = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
-          if (tempIdx !== -1) {
-            // 替换临时消息为真实消息
-            const newList = [...list]
-            newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
-            this.messagesByUser[key] = newList
-            logger.debug('临时消息已确认为真实消息:', uiMsg.id)
-            return
-          }
-        }
-
-        // 步骤2：通过 messageId 精确匹配（服务端生成的唯一ID）
-        const existIdx = list.findIndex((msg) => msg.id === uiMsg.id)
-        if (existIdx !== -1) {
-          // 更新已有消息（如撤回状态变更）
-          const newList = [...list]
-          newList[existIdx] = { ...newList[existIdx], ...uiMsg }
-          this.messagesByUser[key] = newList
-          logger.debug('更新已有消息:', uiMsg.id)
-          return
-        }
-
-        // 步骤3：未匹配到，添加新消息
-        this.messagesByUser[key] = [...list, uiMsg]
-        logger.debug('消息已添加到列表，当前消息数:', this.messagesByUser[key].length)
-        this._updateSession(otherId, ts, isIncoming, false)
-      } catch (e) {
-        logger.error('处理收到的消息失败:', e, '原始payload:', payload)
-      }
+      return useMessageActions()._handleIncoming(payload)
     },
 
-    // 撤回消息
-    async recallMessage(messageId) {
-      if (!messageId) return false
-
-      const isGroup = this.activeUser && this.activeUser.type === 1
-
-      try {
-        if (isGroup) {
-          await recallGroupMessage(this.activeUser.id, messageId)
-        } else {
-          await recallPrivateMessage(messageId)
-        }
-
-        // 成功
-        // 更新本地 store
-        if (!this.activeUser) return true
-        const key = `${isGroup ? 'group' : 'private'}_${this.activeUser.id}`
-        const list = this.messagesByUser[key] || []
-        const idx = list.findIndex((m) => m.id === messageId)
-        if (idx !== -1) {
-          const newList = [...list]
-          newList[idx] = {
-            ...newList[idx],
-            content: '你撤回了一条消息',
-            type: 5,
-            recall: true
-          }
-          this.messagesByUser[key] = newList
-        }
-        return true
-      } catch (e) {
-        logger.error('撤回消息失败:', e)
-        ElMessage.error('撤回失败')
-        return false
-      }
-    },
-
-    sendMessage(toUserId, content, type = 1, fileName = null, fileSize = null, fileUrl = null) {
-      const userStore = useUserStore()
-      const senderId = userStore.userInfo?.id
-
-      if (!senderId) {
-        ElMessage.error('未获取到当前用户信息')
-        return Promise.resolve(false)
-      }
-
-      if (!this.isConnected) {
-        ElMessage.error('连接未建立，请先连接WebSocket')
-        return Promise.resolve(false)
-      }
-
-      if (!content || content.trim() === '') {
-        ElMessage.error('消息内容不能为空')
-        return Promise.resolve(false)
-      }
-
-      // 生成临时消息ID
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-      // 构建消息DTO
-      const dto = {
-        senderId: senderId,
-        receiverId: toUserId,
-        content: content.trim(),
-        messageType: type,
-        fileName: fileName || undefined,
-        fileSize: fileSize || undefined,
-        fileUrl: fileUrl || undefined,
-        tempId: tempId
-      }
-
-      try {
-        logger.debug('发送消息:', dto)
-
-        // 直接发送，不等待回调（STOMP send 默认是异步的且通常无回调）
-        this.stomp.send('/app/chat.private', {}, JSON.stringify(dto))
-
-        // 立即在本地添加临时消息（优化用户体验）
-        const selfMsg = {
-          id: tempId,
-          fromId: 'self',
-          toId: toUserId,
-          content: content.trim(),
-          timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
-          isSending: true, // 标记为发送中状态，等待服务器回包更新状态
-          sendError: false,
-          tempId: tempId
-        }
-
-        const key = `private_${toUserId}`
-        const list = this.messagesByUser[key] || []
-        this.messagesByUser[key] = [...list, selfMsg]
-
-        // 更新会话列表的最后消息时间 (sending message does not increment unread)
-        this._updateSession(toUserId, Date.now(), false, false)
-
-        logger.debug('临时消息已添加，等待服务器确认，临时ID:', tempId)
-        return Promise.resolve(true)
-      } catch (e) {
-        logger.error('发送消息失败:', e)
-        ElMessage.error('发送失败: ' + (e.message || '未知错误'))
-
-        // 如果发送抛出同步异常，标记失败
-        const key = `private_${toUserId}`
-        const list = this.messagesByUser[key] || []
-        const selfMsg = {
-          id: tempId,
-          fromId: 'self',
-          toId: toUserId,
-          content: content.trim(),
-          timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
-          isSending: false,
-          sendError: true,
-          tempId: tempId
-        }
-        this.messagesByUser[key] = [...list, selfMsg]
-
-        return Promise.resolve(false)
-      }
-    },
-
-    // 发送群聊消息
-    sendGroupMessage(groupId, content, type = 1, fileName = null, fileSize = null, fileUrl = null) {
-      const userStore = useUserStore()
-      const senderId = userStore.userInfo?.id
-
-      if (!senderId) {
-        ElMessage.error('未获取到当前用户信息')
-        return Promise.resolve(false)
-      }
-
-      if (!this.isConnected) {
-        ElMessage.error('连接未建立，请先连接WebSocket')
-        return Promise.resolve(false)
-      }
-
-      if (!content || content.trim() === '') {
-        ElMessage.error('消息内容不能为空')
-        return Promise.resolve(false)
-      }
-
-      if (!groupId) {
-        ElMessage.error('群聊ID不能为空')
-        return Promise.resolve(false)
-      }
-
-      // 生成临时消息ID
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-      // 构建群聊消息DTO
-      const dto = {
-        senderId: senderId,
-        groupId: groupId,
-        content: content.trim(),
-        messageType: type,
-        fileName: fileName || undefined,
-        fileSize: fileSize || undefined,
-        fileUrl: fileUrl || undefined,
-        tempId: tempId
-      }
-
-      try {
-        logger.debug('发送群聊消息:', dto)
-
-        // 发送到群聊端点
-        this.stomp.send('/app/chat.group', {}, JSON.stringify(dto))
-
-        // 立即在本地添加临时消息（优化用户体验）
-        const selfMsg = {
-          id: tempId,
-          fromId: 'self',
-          toId: groupId,
-          groupId: groupId,
-          content: content.trim(),
-          timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
-          isSending: true, // 标记为发送中状态，等待服务器回包更新状态
-          sendError: false,
-          tempId: tempId
-        }
-
-        const key = `group_${groupId}`
-        const list = this.messagesByUser[key] || []
-        this.messagesByUser[key] = [...list, selfMsg]
-
-        // 更新会话列表的最后消息时间
-        this._updateSession(groupId, Date.now(), false, true)
-
-        logger.debug('群聊临时消息已添加，等待服务器确认，临时ID:', tempId)
-        return Promise.resolve(true)
-      } catch (e) {
-        logger.error('发送群聊消息失败:', e)
-        ElMessage.error('发送失败: ' + (e.message || '未知错误'))
-
-        // 如果发送抛出同步异常，标记失败
-        const key = `group_${groupId}`
-        const list = this.messagesByUser[key] || []
-        const selfMsg = {
-          id: tempId,
-          fromId: 'self',
-          toId: groupId,
-          groupId: groupId,
-          content: content.trim(),
-          timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
-          isSending: false,
-          sendError: true,
-          tempId: tempId
-        }
-        this.messagesByUser[key] = [...list, selfMsg]
-
-        return Promise.resolve(false)
-      }
-    },
-
-    // 处理接收到的群聊消息
     _handleGroupMessage(payload) {
-      try {
-        logger.debug('收到群聊消息:', payload)
-
-        // 优先处理撤回消息 (RecallMessageDTO 结构不同，包含 isGroup: true 和 recallUserId)
-        if (payload.isGroup && payload.recallUserId) {
-          const groupId = payload.chatId
-          const messageId = payload.messageId
-          const key = `group_${groupId}`
-          const list = this.messagesByUser[key] || []
-
-          const idx = list.findIndex((m) => m.id === messageId)
-          if (idx !== -1) {
-            const newList = [...list]
-            const oldMsg = newList[idx]
-            const senderNickname = oldMsg.senderNickname || '成员'
-            const isSelf = oldMsg.fromId === 'self'
-
-            newList[idx] = {
-              ...oldMsg,
-              content: isSelf ? '你撤回了一条消息' : `"${senderNickname}" 撤回了一条消息`,
-              type: 5,
-              recall: true
-            }
-            this.messagesByUser[key] = newList
-            logger.debug('群聊消息已更新为撤回状态:', messageId)
-          } else {
-            logger.warn('收到群聊撤回通知，但本地未找到对应消息:', messageId)
-          }
-          return
-        }
-
-        const userStore = useUserStore()
-        const selfId = userStore.userInfo?.id
-
-        if (!selfId) {
-          logger.error('未获取到当前用户信息')
-          return
-        }
-
-        const groupId = payload.groupId
-        if (!groupId) {
-          logger.error('群聊消息缺少 groupId:', payload)
-          return
-        }
-
-        // 处理时间戳
-        let ts
-        if (payload.sendTime) {
-          ts = new Date(payload.sendTime).getTime()
-          if (isNaN(ts)) {
-            ts = Date.now()
-            logger.warn('群聊消息时间格式不正确，使用当前时间:', payload.sendTime)
-          }
-        } else {
-          ts = Date.now()
-          logger.warn('群聊消息缺少 sendTime，使用当前时间')
-        }
-
-        // 构建前端消息对象
-        const uiMsg = {
-          id: payload.messageId || payload.id || `group_${Date.now()}`,
-          fromId: payload.senderId === selfId ? 'self' : payload.senderId,
-          toId: groupId,
-          groupId: groupId,
-          content: payload.content,
-          timestamp: ts,
-          type: payload.messageType || 1,
-          fileName: payload.fileName,
-          fileSize: payload.fileSize,
-          fileUrl: payload.fileUrl,
-          senderNickname: payload.senderNickname,
-          senderAvatar: payload.senderAvatar,
-          messageSeq: payload.messageSeq,
-          isSending: false,
-          isReceived: true,
-          sendError: false,
-          tempId: payload.tempId
-        }
-
-        // 特殊处理撤回消息的内容展示
-        if (uiMsg.type === 5) {
-          uiMsg.content =
-            uiMsg.fromId === 'self' ? '你撤回了一条消息' : `"${uiMsg.senderNickname || '成员'}" 撤回了一条消息`
-        }
-
-        logger.debug('构建的群聊UI消息:', uiMsg)
-
-        // 更新消息列表
-        const key = `group_${groupId}`
-        const list = this.messagesByUser[key] || []
-
-        // 步骤1：通过 tempId 精确匹配（优先）
-        if (payload.tempId) {
-          const tempIdx = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
-          if (tempIdx !== -1) {
-            // 替换临时消息为真实消息
-            const newList = [...list]
-            newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
-            this.messagesByUser[key] = newList
-            logger.debug('群聊临时消息已确认为真实消息:', uiMsg.id)
-            return
-          }
-        }
-
-        // 步骤2：通过 messageId 精确匹配（服务端生成的唯一ID）
-        const existIdx = list.findIndex((msg) => msg.id === uiMsg.id)
-        if (existIdx !== -1) {
-          // 更新已有消息（如撤回状态变更）
-          const newList = [...list]
-          newList[existIdx] = {
-            ...newList[existIdx],
-            ...uiMsg,
-            type: uiMsg.type,
-            content:
-              uiMsg.type === 5
-                ? uiMsg.fromId === 'self'
-                  ? '你撤回了一条消息'
-                  : `"${uiMsg.senderNickname || '成员'}" 撤回了一条消息`
-                : uiMsg.content,
-            recall: uiMsg.type === 5
-          }
-          this.messagesByUser[key] = newList
-          logger.debug('更新群聊已有消息:', uiMsg.id)
-          return
-        }
-
-        // 步骤3：通过 messageSeq 去重（群聊特有，按序列号精确去重）
-        if (uiMsg.messageSeq) {
-          const seqDup = list.some((msg) => msg.messageSeq === uiMsg.messageSeq)
-          if (seqDup) {
-            logger.debug('跳过重复的群聊消息 (messageSeq):', uiMsg.messageSeq)
-            return
-          }
-        }
-
-        // 步骤4：未匹配到，添加新消息
-        this.messagesByUser[key] = [...list, uiMsg]
-        logger.debug('群聊消息已添加到列表，当前消息数:', this.messagesByUser[key].length)
-        const isIncoming = payload.senderId !== selfId
-        this._updateSession(groupId, ts, isIncoming, true)
-      } catch (e) {
-        logger.error('处理群聊消息失败:', e, '原始payload:', payload)
-      }
+      return useMessageActions()._handleGroupMessage(payload)
     },
 
-    // 订阅所有群聊消息
-    _subscribeAllGroups() {
-      if (!this.isConnected) {
-        logger.warn('WebSocket 未连接，无法订阅群聊')
-        return
-      }
-
-      // 从会话列表中获取所有群聊（type === 1）
-      const groupSessions = this.sessions.filter((s) => s.type === 1)
-
-      groupSessions.forEach((session) => {
-        const groupId = session.id
-        if (groupId && !this.groupSubscriptions.has(groupId)) {
-          this._subscribeGroup(groupId)
-        }
-      })
-
-      logger.debug(`已订阅 ${this.groupSubscriptions.size} 个群聊`)
+    _handleRecallNotification(payload) {
+      return useMessageActions()._handleRecallNotification(payload)
     },
 
-    // 订阅单个群聊
-    _subscribeGroup(groupId) {
-      if (!this.isConnected || !groupId) {
-        return
-      }
-
-      // 如果已经订阅，跳过
-      if (this.groupSubscriptions.has(groupId)) {
-        logger.debug(`群聊 ${groupId} 已订阅，跳过`)
-        return
-      }
-
-      try {
-        const topic = `/topic/group/${groupId}`
-        const subscription = this.stomp.subscribe(topic, (message) => {
-          logger.debug(`收到群聊消息，群ID: ${groupId}, body:`, message.body)
-          try {
-            const result = JSON.parse(message.body)
-            logger.debug('解析后的群聊消息:', result)
-
-            // 处理群聊消息
-            this._handleGroupMessage(result)
-          } catch (e) {
-            logger.error('解析群聊消息失败:', e, '原始消息:', message.body)
-            ElMessage.error('群聊消息解析失败')
-          }
-        })
-
-        this.groupSubscriptions.set(groupId, subscription)
-        logger.debug(`已订阅群聊: ${groupId}, topic: ${topic}`)
-      } catch (e) {
-        logger.error(`订阅群聊 ${groupId} 失败:`, e)
-      }
+    recallMessage(messageId) {
+      return useMessageActions().recallMessage(messageId)
     },
 
-    // 取消订阅群聊
-    _unsubscribeGroup(groupId) {
-      if (!groupId) return
+    // ---- 委托给 useWebSocketStore ----
 
-      const subscription = this.groupSubscriptions.get(groupId)
-      if (subscription) {
-        try {
-          subscription.unsubscribe()
-          this.groupSubscriptions.delete(groupId)
-          logger.debug(`已取消订阅群聊: ${groupId}`)
-        } catch (e) {
-          logger.error(`取消订阅群聊 ${groupId} 失败:`, e)
-        }
-      }
+    connect() {
+      return useWebSocketStore().connect()
     },
 
-    // 断开连接方法
     disconnect() {
-      // 取消所有订阅
-      this.subscriptions.forEach((subscription, key) => {
-        try {
-          subscription.unsubscribe()
-          logger.debug('取消订阅:', key)
-        } catch (e) {
-          logger.error('取消订阅失败:', key, e)
-        }
-      })
-      this.subscriptions.clear()
-
-      // 取消所有群聊订阅
-      this.groupSubscriptions.forEach((subscription, groupId) => {
-        try {
-          subscription.unsubscribe()
-          logger.debug('取消群聊订阅:', groupId)
-        } catch (e) {
-          logger.error('取消群聊订阅失败:', groupId, e)
-        }
-      })
-      this.groupSubscriptions.clear()
-
-      // 停止心跳
-      this.stopHeartbeat()
-      this.heartbeatCount = 0 // 重置心跳计数器
-
-      // 断开 STOMP 连接
-      if (this.stomp) {
-        try {
-          this.stomp.disconnect(() => {
-            logger.debug('WebSocket 已断开')
-          })
-        } catch (e) {
-          logger.error('断开连接时出错:', e)
-        }
-        this.stomp = null
-      }
-
-      this.connected = false
-      this.connecting = false
-      this.connectionError = null
+      return useWebSocketStore().disconnect()
     },
 
-    // 重新连接方法
     reconnect() {
-      if (this.connected || this.connecting) {
-        logger.debug('已在连接或已连接，跳过重连')
-        return
-      }
-      logger.debug('尝试重新连接...')
-      this.disconnect()
-
-      // 延迟一下再重连，避免频繁重连
-      setTimeout(() => {
-        this.connect()
-      }, 1000)
+      return useWebSocketStore().reconnect()
     },
 
-    // 检查连接状态
     checkConnectionStatus() {
-      logger.debug('=== WebSocket 连接状态 ===')
-      logger.debug('STOMP 实例:', this.stomp)
-      logger.debug('连接中:', this.connecting)
-      logger.debug('已连接:', this.connected)
-      logger.debug('STOMP 连接状态:', this.stomp?.connected)
-      logger.debug('连接错误:', this.connectionError)
-      logger.debug('活跃订阅数量:', this.subscriptions.size)
-
-      return {
-        stomp: this.stomp,
-        connecting: this.connecting,
-        connected: this.connected,
-        stompConnected: this.stomp?.connected,
-        error: this.connectionError,
-        subscriptions: this.subscriptions.size
-      }
+      return useWebSocketStore().checkConnectionStatus()
     },
 
-    // 手动测试消息发送
-    testSendMessage(toUserId = 4) {
-      const testContent = `测试消息 ${new Date().toLocaleTimeString()}`
-      logger.debug('发送测试消息给用户:', toUserId, '内容:', testContent)
-      return this.sendMessage(toUserId, testContent)
-    },
-
-    // 启动应用层心跳
-    startHeartbeat() {
-      this.stopHeartbeat() // 防止重复启动
-      logger.debug('启动应用层心跳，每30秒发送一次')
-      this.heartbeatTimer = setInterval(() => {
-        if (this.isConnected) {
-          try {
-            // 发送空消息到 /app/heartbeat
-            this.stomp.send('/app/heartbeat', {}, JSON.stringify({}))
-            logger.debug('已发送心跳包')
-
-            // 每2次心跳（60秒）刷新一次好友在线状态
-            if (!this.heartbeatCount) this.heartbeatCount = 0
-            this.heartbeatCount++
-            if (this.heartbeatCount >= 2) {
-              this.heartbeatCount = 0
-              this._refreshFriendStatus()
-            }
-          } catch (e) {
-            logger.error('发送心跳失败:', e)
-          }
-        }
-      }, 30000) // 改为30秒，更及时
-    },
-
-    // 停止应用层心跳
-    stopHeartbeat() {
-      if (this.heartbeatTimer) {
-        clearInterval(this.heartbeatTimer)
-        this.heartbeatTimer = null
-        logger.debug('已停止应用层心跳')
-      }
+    testSendMessage(toUserId) {
+      return useWebSocketStore().testSendMessage(toUserId)
     }
   }
 })
