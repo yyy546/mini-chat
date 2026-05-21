@@ -91,12 +91,12 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await getUserDetail()
-    if (res.code === 1 && res.data) {
+    if (res) {
       Object.assign(form, {
-        nickname: res.data.nickname || '',
-        gender: res.data.gender || '未知',
-        signature: res.data.signature || '',
-        avatar: res.data.avatar || ''
+        nickname: res.nickname || '',
+        gender: res.gender || '未知',
+        signature: res.signature || '',
+        avatar: res.avatar || ''
       })
     }
   } catch (e) {
@@ -163,17 +163,12 @@ const handleSubmit = async () => {
         }
 
         const res = await updateUserDetail(updateData)
-        if (res.code === 1) {
-          ElMessage.success('修改成功')
-          // 更新Store中的用户信息
-          if (res.data) {
-            userStore.userInfo = { ...userStore.userInfo, ...res.data }
-          }
-          visible.value = false
-          emit('success')
-        } else {
-          ElMessage.error(res.msg || '修改失败')
+        ElMessage.success('修改成功')
+        if (res) {
+          userStore.userInfo = { ...userStore.userInfo, ...res }
         }
+        visible.value = false
+        emit('success')
       } catch (e) {
         logger.error('修改个人资料失败', e)
         ElMessage.error('修改个人资料失败')

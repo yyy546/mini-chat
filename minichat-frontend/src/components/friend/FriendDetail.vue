@@ -270,9 +270,7 @@ const loadComments = async (post) => {
   const postId = getPostId(post)
   try {
     const res = await getSpaceCommentList(postId)
-    if (res.code === 1) {
-      post.comments = res.data || []
-    }
+    post.comments = res || []
   } catch (e) {
     logger.error('加载评论失败:', e)
   }
@@ -303,15 +301,11 @@ const handlePublishComment = async (post) => {
       publishId: userStore.userInfo?.id,
       content: commentContent.value
     }
-    const res = await publishSpaceComment(data)
-    if (res.code === 1) {
-      ElMessage.success('评论成功')
-      commentContent.value = ''
-      await loadComments(post)
-      post.commentsCount = (post.commentsCount || 0) + 1
-    } else {
-      ElMessage.error(res.msg || '评论失败')
-    }
+    await publishSpaceComment(data)
+    ElMessage.success('评论成功')
+    commentContent.value = ''
+    await loadComments(post)
+    post.commentsCount = (post.commentsCount || 0) + 1
   } catch (e) {
     logger.error(e)
     ElMessage.error('评论出错')
@@ -322,14 +316,10 @@ const handlePublishComment = async (post) => {
 
 const handleDeleteComment = async (commentId, post) => {
   try {
-    const res = await deleteSpaceComment(commentId)
-    if (res.code === 1) {
-      ElMessage.success('删除成功')
-      await loadComments(post)
-      post.commentsCount = Math.max(0, (post.commentsCount || 0) - 1)
-    } else {
-      ElMessage.error(res.msg || '删除失败')
-    }
+    await deleteSpaceComment(commentId)
+    ElMessage.success('删除成功')
+    await loadComments(post)
+    post.commentsCount = Math.max(0, (post.commentsCount || 0) - 1)
   } catch (e) {
     logger.error(e)
     ElMessage.error('删除出错')
@@ -349,12 +339,9 @@ const handleShowSpace = async () => {
   loadingSpace.value = true
   spaceDialogVisible.value = true
   try {
-    const res = await getSpacePostList(currentUserId, friendId)
-    if (res.code === 1) {
-      const posts = res.data || []
-      spacePosts.value = posts
-      syncLikedPostMap(posts)
-    }
+    const posts = await getSpacePostList(currentUserId, friendId)
+    spacePosts.value = posts || []
+    syncLikedPostMap(posts)
   } catch (e) {
     logger.error(e)
   } finally {

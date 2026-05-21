@@ -70,24 +70,14 @@ export const useChatStore = defineStore('chat', {
     async fetchSessions() {
       this.sessionLoading = true
       try {
-        const res = await getSessionList()
-        const unwrap = (res) => {
-          if (Array.isArray(res)) return res
-          if (res && typeof res === 'object') {
-            if (Array.isArray(res.data)) return res.data
-            if (res.data) return res.data
-          }
-          return []
-        }
-        let list = unwrap(res) || []
+        let list = await getSessionList()
+        list = Array.isArray(list) ? list : []
 
         // 获取好友列表，用于过滤已删除的好友
         try {
-          const friendRes = await getFriendList()
-          const friendList = unwrap(friendRes) || []
-          // 提取所有未删除的好友ID
+          const friendList = await getFriendList()
           const validFriendIds = new Set()
-          friendList.forEach((friend) => {
+          ;(Array.isArray(friendList) ? friendList : []).forEach((friend) => {
             const friendId = friend.friendId ?? friend.friend_id ?? friend.userId ?? friend.id
             if (friendId) {
               validFriendIds.add(friendId)
@@ -224,18 +214,14 @@ export const useChatStore = defineStore('chat', {
 
         if (sessionType === 1) {
           const res = await getGroupMessageHistory(userId, pageToLoad, pageSize)
-          if (res && res.code === 1 && res.data) {
-            rawList = res.data.records || []
-            total = res.data.total || 0
-            pagination.hasMore = res.data.current * res.data.size < total
-          }
+          rawList = res?.records || []
+          total = res?.total || 0
+          pagination.hasMore = (res?.current || 0) * (res?.size || 0) < total
         } else {
           const res = await getPrivateMessageHistory(userId, pageToLoad, pageSize)
-          if (res && res.code === 1 && res.data) {
-            rawList = res.data.records || []
-            total = res.data.total || 0
-            pagination.hasMore = res.data.current * res.data.size < total
-          }
+          rawList = res?.records || []
+          total = res?.total || 0
+          pagination.hasMore = (res?.current || 0) * (res?.size || 0) < total
         }
 
         const list = rawList.map((m) => {
@@ -570,8 +556,8 @@ export const useChatStore = defineStore('chat', {
           const ids = friendStore.friends.map((f) => f.id)
           const { batchCheckUserOnlineStatus } = await import('../api/userStatus')
           const statusRes = await batchCheckUserOnlineStatus(ids)
-          if (statusRes && statusRes.code === 1) {
-            const statusMap = statusRes.data
+          if (statusRes) {
+            const statusMap = statusRes
             // 批量更新好友状态
             friendStore.friends.forEach((friend) => {
               const isOnline = !!statusMap[friend.id]
@@ -805,36 +791,29 @@ export const useChatStore = defineStore('chat', {
       const isGroup = this.activeUser && this.activeUser.type === 1
 
       try {
-        let res
         if (isGroup) {
-          res = await recallGroupMessage(this.activeUser.id, messageId)
+          await recallGroupMessage(this.activeUser.id, messageId)
         } else {
-          res = await recallPrivateMessage(messageId)
+          await recallPrivateMessage(messageId)
         }
 
-        if (res.code === 1) {
-          // 成功
-          // 更新本地 store
-          // 找到当前活跃会话的消息
-          if (!this.activeUser) return true
-          const key = `${isGroup ? 'group' : 'private'}_${this.activeUser.id}`
-          const list = this.messagesByUser[key] || []
-          const idx = list.findIndex((m) => m.id === messageId)
-          if (idx !== -1) {
-            const newList = [...list]
-            newList[idx] = {
-              ...newList[idx],
-              content: '你撤回了一条消息',
-              type: 5, // 5 for recall
-              recall: true
-            }
-            this.messagesByUser[key] = newList
+        // 成功
+        // 更新本地 store
+        if (!this.activeUser) return true
+        const key = `${isGroup ? 'group' : 'private'}_${this.activeUser.id}`
+        const list = this.messagesByUser[key] || []
+        const idx = list.findIndex((m) => m.id === messageId)
+        if (idx !== -1) {
+          const newList = [...list]
+          newList[idx] = {
+            ...newList[idx],
+            content: '你撤回了一条消息',
+            type: 5,
+            recall: true
           }
-          return true
-        } else {
-          ElMessage.error(res.msg || '撤回失败')
-          return false
+          this.messagesByUser[key] = newList
         }
+        return true
       } catch (e) {
         logger.error('撤回消息失败:', e)
         ElMessage.error('撤回失败')

@@ -53,9 +53,7 @@ const fetchGroups = async () => {
   loading.value = true
   try {
     const res = await getGroupList()
-    if (res.code === 1) {
-      groups.value = res.data
-    }
+    groups.value = res
   } catch (e) {
     logger.error(e)
   } finally {

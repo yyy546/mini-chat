@@ -2,6 +2,11 @@ import request from '../utils/request'
 
 const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024
 
+/**
+ * 统一文件上传入口（根据 scene 自动选择上传策略）
+ * @param {{ file: File, scene: string, bizType?: string, bizId?: number, chatFileType?: number, groupId?: number, onProgress?: (p: number) => void }} options
+ * @returns {Promise<{ fileUrl: string, fileName: string, fileSize: number, messageType?: number }>}
+ */
 export async function uploadFileUnified(options) {
   const { file, scene, bizType, bizId, chatFileType = 3, groupId, onProgress } = options || {}
   if (!file) {
@@ -40,11 +45,8 @@ async function uploadUserAvatar(file, onProgress) {
       onProgress((e.loaded / e.total) * 100)
     }
   })
-  if (res.code !== 1) {
-    throw new Error(res.msg || '头像上传失败')
-  }
   return {
-    fileUrl: res.data,
+    fileUrl: res,
     fileName: file.name,
     fileSize: file.size
   }
@@ -62,11 +64,8 @@ async function uploadGroupAvatar(groupId, file, onProgress) {
       onProgress((e.loaded / e.total) * 100)
     }
   })
-  if (res.code !== 1) {
-    throw new Error(res.msg || '群头像上传失败')
-  }
   return {
-    fileUrl: res.data,
+    fileUrl: res,
     fileName: file.name,
     fileSize: file.size
   }
@@ -84,11 +83,8 @@ async function uploadSpaceImage(file, onProgress) {
       onProgress((e.loaded / e.total) * 100)
     }
   })
-  if (res.code !== 1) {
-    throw new Error(res.msg || '空间图片上传失败')
-  }
   return {
-    fileUrl: res.data,
+    fileUrl: res,
     fileName: file.name,
     fileSize: file.size
   }
@@ -108,10 +104,7 @@ async function uploadChatSmallFile(scene, file, type, onProgress) {
       onProgress((e.loaded / e.total) * 100)
     }
   })
-  if (res.code !== 1) {
-    throw new Error(res.msg || '文件上传失败')
-  }
-  const data = res.data || {}
+  const data = res || {}
   return {
     fileUrl: data.fileUrl,
     fileName: data.fileName || file.name,
@@ -125,28 +118,22 @@ async function uploadLargeFileWithResume(options) {
 
   const fileHash = await calcSimpleHash(file)
 
-  const initRes = await request.post('/upload/init', {
-    fileName: file.name,
-    fileSize: file.size,
-    fileHash,
-    bizType,
-    bizId
-  })
-  if (initRes.code !== 1) {
-    throw new Error(initRes.msg || '初始化断点续传失败')
-  }
-  const initData = initRes.data || {}
+  const initData =
+    (await request.post('/upload/init', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileHash,
+      bizType,
+      bizId
+    })) || {}
   const uploadId = initData.uploadId
   const chunkSize = initData.chunkSize
   const totalChunks = initData.totalChunks
 
-  const statusRes = await request.get('/upload/status', {
-    params: { uploadId }
-  })
-  if (statusRes.code !== 1) {
-    throw new Error(statusRes.msg || '获取上传状态失败')
-  }
-  const statusData = statusRes.data || {}
+  const statusData =
+    (await request.get('/upload/status', {
+      params: { uploadId }
+    })) || {}
   const uploadedIndexes = statusData.uploadedChunkIndexList || []
   const uploadedSet = new Set(uploadedIndexes)
 
@@ -185,13 +172,10 @@ async function uploadLargeFileWithResume(options) {
     }
   }
 
-  const completeRes = await request.post('/upload/complete', null, {
-    params: { uploadId }
-  })
-  if (completeRes.code !== 1) {
-    throw new Error(completeRes.msg || '完成断点续传失败')
-  }
-  const data = completeRes.data || {}
+  const data =
+    (await request.post('/upload/complete', null, {
+      params: { uploadId }
+    })) || {}
   const messageType = chatFileType === 2 ? 2 : 3
   return {
     fileUrl: data.fileUrl,

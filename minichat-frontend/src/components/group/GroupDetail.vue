@@ -192,11 +192,7 @@ const fetchGroupDetail = async (id) => {
   }
   try {
     const res = await getGroupProfile(id)
-    if (res.code === 1) {
-      group.value = res.data
-    } else {
-      ElMessage.error(res.msg || '获取群组信息失败')
-    }
+    group.value = res
   } catch (e) {
     logger.error(e)
     ElMessage.error('获取群组信息失败')
@@ -271,7 +267,7 @@ const saveGroupInfo = async () => {
 
   editLoading.value = true
   try {
-    const res = await updateGroupProfile(group.value.id, {
+    await updateGroupProfile(group.value.id, {
       groupName: editForm.value.groupName,
       announcement: editForm.value.announcement,
       avatar: editForm.value.avatar,
@@ -279,14 +275,9 @@ const saveGroupInfo = async () => {
       joinPolicy: editForm.value.joinPolicy,
       invitePolicy: editForm.value.invitePolicy
     })
-
-    if (res.code === 1) {
-      ElMessage.success('群资料修改成功')
-      showEditDialog.value = false
-      fetchGroupDetail(group.value.id)
-    } else {
-      ElMessage.error(res.msg || '修改失败')
-    }
+    ElMessage.success('群资料修改成功')
+    showEditDialog.value = false
+    fetchGroupDetail(group.value.id)
   } catch (e) {
     logger.error(e)
     ElMessage.error('修改失败')
@@ -309,16 +300,11 @@ const handleExitGroup = async () => {
   }
 
   try {
-    const res = await exitGroup(group.value.id)
-    if (res.code === 1) {
-      ElMessage.success('退出群组成功')
-      // 退出成功后，清空当前群组信息，并触发外部更新
-      group.value = null
-      emit('message', null) // 通知父组件清除选中状态
-      window.location.reload() // 简单刷新页面
-    } else {
-      ElMessage.error(res.msg || '退出群组失败')
-    }
+    await exitGroup(group.value.id)
+    ElMessage.success('退出群组成功')
+    group.value = null
+    emit('message', null)
+    window.location.reload()
   } catch (e) {
     ElMessage.error('退出群组出错')
   }
@@ -336,15 +322,11 @@ const handleDismissGroup = async () => {
     return
   }
   try {
-    const res = await dismissGroup(group.value.id)
-    if (res.code === 1) {
-      ElMessage.success('解散群组成功')
-      group.value = null
-      emit('message', null)
-      window.location.reload()
-    } else {
-      ElMessage.error(res.msg || '解散群组失败')
-    }
+    await dismissGroup(group.value.id)
+    ElMessage.success('解散群组成功')
+    group.value = null
+    emit('message', null)
+    window.location.reload()
   } catch (e) {
     ElMessage.error('解散群组出错')
   }
