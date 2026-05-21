@@ -1,22 +1,23 @@
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
 import {
-    searchUsers,
-    sendFriendRequest,
-    getIncomingRequests,
-    getSentRequests,
-    handleFriendRequest,
-    getFriendList,
-    setFriendRemark,
-    updateFriendRemark,
-    getFriendGroupList,
-    getFriendGroupItemList,
-    updateFriendGroup,
-    getFriendDetail,
-    deleteFriend
-  } from '../api/friend'
+  searchUsers,
+  sendFriendRequest,
+  getIncomingRequests,
+  getSentRequests,
+  handleFriendRequest,
+  getFriendList,
+  setFriendRemark,
+  updateFriendRemark,
+  getFriendGroupList,
+  getFriendGroupItemList,
+  updateFriendGroup,
+  getFriendDetail,
+  deleteFriend
+} from '../api/friend'
 import { batchCheckUserOnlineStatus } from '../api/userStatus'
 import { useChatStore } from './chat'
+import logger from '../utils/logger'
 
 const unwrap = (res) => {
   if (Array.isArray(res)) return res
@@ -46,35 +47,34 @@ export const useFriendStore = defineStore('friend', {
         const res = await getFriendList()
         const list = unwrap(res) || []
         const normalize = (raw) => {
-        const friendId = raw.friendId ?? raw.friend_id ?? raw.userId ?? raw.uid
-        return {
-          ...raw,
-          relationId: raw.id,
-          friendId: friendId ?? raw.id,
-          id: friendId ?? raw.id, // 统一对外使用 id 为好友的用户ID
-          remark: raw.remark || raw.remarkName, // Ensure remark is mapped
-          online: false // 默认为 false，后续通过 batchCheckUserOnlineStatus 更新
+          const friendId = raw.friendId ?? raw.friend_id ?? raw.userId ?? raw.uid
+          return {
+            ...raw,
+            relationId: raw.id,
+            friendId: friendId ?? raw.id,
+            id: friendId ?? raw.id, // 统一对外使用 id 为好友的用户ID
+            remark: raw.remark || raw.remarkName, // Ensure remark is mapped
+            online: false // 默认为 false，后续通过 batchCheckUserOnlineStatus 更新
+          }
         }
-      }
         this.friends = Array.isArray(list) ? list.map(normalize) : []
-        
+
         // 批量查询好友在线状态
         if (this.friends.length > 0) {
-            const ids = this.friends.map(f => f.id)
-            try {
-                const statusRes = await batchCheckUserOnlineStatus(ids)
-                if (statusRes && statusRes.code === 1) {
-                    const statusMap = statusRes.data
-                    this.friends = this.friends.map(f => ({
-                        ...f,
-                        online: !!statusMap[f.id]
-                    }))
-                }
-            } catch (err) {
-                console.error('Failed to fetch online status', err)
+          const ids = this.friends.map((f) => f.id)
+          try {
+            const statusRes = await batchCheckUserOnlineStatus(ids)
+            if (statusRes && statusRes.code === 1) {
+              const statusMap = statusRes.data
+              this.friends = this.friends.map((f) => ({
+                ...f,
+                online: !!statusMap[f.id]
+              }))
             }
+          } catch (err) {
+            logger.error('Failed to fetch online status', err)
+          }
         }
-
       } catch (e) {
         ElMessage.error('获取好友列表失败')
       } finally {
@@ -106,17 +106,19 @@ export const useFriendStore = defineStore('friend', {
     // 更新好友在线状态
     updateFriendStatus(userId, isOnline) {
       // 使用 loose equality (==) 兼容 string/number 类型的 ID
-      const friendIndex = this.friends.findIndex(f => f.id == userId || f.friendId == userId)
+      const friendIndex = this.friends.findIndex((f) => f.id == userId || f.friendId == userId)
       if (friendIndex !== -1) {
         // 创建新对象以触发响应式更新
         const friend = this.friends[friendIndex]
         // 只有当状态真正改变时才更新，避免不必要的响应式触发
         if (friend.online !== isOnline) {
           this.friends[friendIndex] = { ...friend, online: isOnline }
-          console.log(`好友 ${friend.nickname || friend.username || userId} (ID: ${userId}) 状态已更新为: ${isOnline ? '在线' : '离线'}`)
+          logger.debug(
+            `好友 ${friend.nickname || friend.username || userId} (ID: ${userId}) 状态已更新为: ${isOnline ? '在线' : '离线'}`
+          )
         }
       } else {
-        console.warn(`收到未知好友的状态更新，ID: ${userId}`)
+        logger.warn(`收到未知好友的状态更新，ID: ${userId}`)
       }
     },
 
@@ -149,9 +151,7 @@ export const useFriendStore = defineStore('friend', {
     },
 
     async processRequest(requestId, actionOrStatus) {
-      const status = typeof actionOrStatus === 'string'
-        ? (actionOrStatus === 'accept' ? 1 : 2)
-        : actionOrStatus
+      const status = typeof actionOrStatus === 'string' ? (actionOrStatus === 'accept' ? 1 : 2) : actionOrStatus
       try {
         await handleFriendRequest({ requestId, status })
         ElMessage.success(status === 1 ? '已同意申请' : '已拒绝申请')
@@ -166,14 +166,14 @@ export const useFriendStore = defineStore('friend', {
       try {
         const res = await getFriendGroupList()
         const rawGroups = unwrap(res) || []
-        this.groups = rawGroups.map(g => ({
+        this.groups = rawGroups.map((g) => ({
           ...g,
           items: [],
           expanded: false,
           loaded: false
         }))
       } catch (e) {
-        console.error('获取分组列表失败', e)
+        logger.error('获取分组列表失败', e)
       }
     },
 
@@ -181,23 +181,23 @@ export const useFriendStore = defineStore('friend', {
       try {
         const res = await getFriendGroupItemList(groupName)
         const items = unwrap(res) || []
-        const group = this.groups.find(g => g.groupName === groupName)
+        const group = this.groups.find((g) => g.groupName === groupName)
         if (group) {
-          group.items = items.map(item => ({
-             ...item,
-             // Mapping from FriendGroupItemVO
-             id: item.friendId,
-             avatar: item.friendAvatar,
-             remark: item.remarkName,
-             nickname: item.friendNickname,
-             online: item.onlineStatus === true || item.onlineStatus === 1,
-             // No signature in VO, but we can keep nickname as fallback for display if needed
-             signature: null 
+          group.items = items.map((item) => ({
+            ...item,
+            // Mapping from FriendGroupItemVO
+            id: item.friendId,
+            avatar: item.friendAvatar,
+            remark: item.remarkName,
+            nickname: item.friendNickname,
+            online: item.onlineStatus === true || item.onlineStatus === 1,
+            // No signature in VO, but we can keep nickname as fallback for display if needed
+            signature: null
           }))
           group.loaded = true
         }
       } catch (e) {
-        console.error(`获取分组 ${groupName} 好友失败`, e)
+        logger.error(`获取分组 ${groupName} 好友失败`, e)
       }
     },
 
@@ -205,7 +205,10 @@ export const useFriendStore = defineStore('friend', {
       try {
         await updateFriendGroup({ friendId, groupName })
         ElMessage.success('好友分组修改成功')
-        if (this.currentFriendDetail && (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)) {
+        if (
+          this.currentFriendDetail &&
+          (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)
+        ) {
           this.currentFriendDetail.groupName = groupName
         }
         await this.fetchFriends()
@@ -217,31 +220,31 @@ export const useFriendStore = defineStore('friend', {
     },
 
     async fetchFriendDetail(friendId) {
-       try {
-         const res = await getFriendDetail(friendId)
-         const data = unwrap(res)
-         if (data) {
-           this.currentFriendDetail = {
-             ...data,
-             // Mapping from FriendDetailVO
-             id: data.friendUserId,
-             avatar: data.friendAvatar,
-             remark: data.remarkName,
-             nickname: data.friendNickname,
-             groupName: data.groupName,
-             gender: data.gender,
-             signature: data.signature,
-             online: false // Detail VO doesn't have online status, defaults to false or need separate check
-           }
-           // Try to find online status from existing list if possible
-           const friendInList = this.friends.find(f => f.id === data.friendUserId)
-           if (friendInList) {
-             this.currentFriendDetail.online = friendInList.online
-           }
-         }
-       } catch(e) {
-         console.error('获取好友详情失败', e)
-       }
+      try {
+        const res = await getFriendDetail(friendId)
+        const data = unwrap(res)
+        if (data) {
+          this.currentFriendDetail = {
+            ...data,
+            // Mapping from FriendDetailVO
+            id: data.friendUserId,
+            avatar: data.friendAvatar,
+            remark: data.remarkName,
+            nickname: data.friendNickname,
+            groupName: data.groupName,
+            gender: data.gender,
+            signature: data.signature,
+            online: false // Detail VO doesn't have online status, defaults to false or need separate check
+          }
+          // Try to find online status from existing list if possible
+          const friendInList = this.friends.find((f) => f.id === data.friendUserId)
+          if (friendInList) {
+            this.currentFriendDetail.online = friendInList.online
+          }
+        }
+      } catch (e) {
+        logger.error('获取好友详情失败', e)
+      }
     },
 
     async updateRemark(friendId, remark) {
@@ -249,24 +252,27 @@ export const useFriendStore = defineStore('friend', {
         await updateFriendRemark({ friendId, remark })
         ElMessage.success('备注已更新')
         // Update local state directly
-        const friend = this.friends.find(f => f.id === friendId)
+        const friend = this.friends.find((f) => f.id === friendId)
         if (friend) {
           friend.remark = remark
         }
         // Sync with groups
         if (this.groups) {
-           this.groups.forEach(group => {
-             if (group.items) {
-               const item = group.items.find(i => i.id === friendId || i.friendId === friendId)
-               if (item) {
-                 item.remark = remark
-               }
-             }
-           })
+          this.groups.forEach((group) => {
+            if (group.items) {
+              const item = group.items.find((i) => i.id === friendId || i.friendId === friendId)
+              if (item) {
+                item.remark = remark
+              }
+            }
+          })
         }
         // Sync with current detail
-        if (this.currentFriendDetail && (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)) {
-            this.currentFriendDetail.remark = remark
+        if (
+          this.currentFriendDetail &&
+          (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)
+        ) {
+          this.currentFriendDetail.remark = remark
         }
       } catch (e) {
         ElMessage.error('更新备注失败')
@@ -275,24 +281,27 @@ export const useFriendStore = defineStore('friend', {
     },
 
     async deleteFriend(friendId) {
-        try {
-            await deleteFriend(friendId)
-            ElMessage.success('好友删除成功')
-            // Refresh friend list
-            await this.fetchFriends()
-            // Clear current friend detail if it was the deleted friend
-            if (this.currentFriendDetail && (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)) {
-                this.currentFriendDetail = null
-            }
-            // Refresh groups
-            await this.fetchFriendGroups()
-            // Refresh chat sessions
-            const chatStore = useChatStore()
-            await chatStore.fetchSessions()
-        } catch (e) {
-            ElMessage.error(e.response?.data?.message || '删除好友失败')
-            throw e
+      try {
+        await deleteFriend(friendId)
+        ElMessage.success('好友删除成功')
+        // Refresh friend list
+        await this.fetchFriends()
+        // Clear current friend detail if it was the deleted friend
+        if (
+          this.currentFriendDetail &&
+          (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)
+        ) {
+          this.currentFriendDetail = null
         }
+        // Refresh groups
+        await this.fetchFriendGroups()
+        // Refresh chat sessions
+        const chatStore = useChatStore()
+        await chatStore.fetchSessions()
+      } catch (e) {
+        ElMessage.error(e.response?.data?.message || '删除好友失败')
+        throw e
+      }
     }
   }
 })

@@ -6,14 +6,20 @@
       <div class="space-profile-header">
         <div class="profile-info">
           <el-avatar :size="60" :src="userStore.userInfo?.avatar" class="profile-avatar">
-            {{ (userStore.userInfo?.nickname || '').slice(0,1) }}
+            {{ (userStore.userInfo?.nickname || '').slice(0, 1) }}
           </el-avatar>
           <div class="profile-text">
             <h2 class="nickname">{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</h2>
           </div>
         </div>
         <div class="space-header-actions">
-          <el-button circle size="default" @click="openTrash" title="回收站" style="width: 50px; height: 50px; font-size: 24px;">
+          <el-button
+            circle
+            size="default"
+            @click="openTrash"
+            title="回收站"
+            style="width: 50px; height: 50px; font-size: 24px"
+          >
             <el-icon><Delete /></el-icon>
           </el-button>
         </div>
@@ -35,159 +41,166 @@
         <!-- 图片预览区 -->
         <div class="image-preview-area" v-if="imageList.length > 0">
           <div class="preview-item" v-for="(img, index) in imageList" :key="index">
-            <el-image 
-              :src="img" 
-              fit="cover" 
-              class="preview-img"
-              :preview-src-list="imageList"
-              :initial-index="index"
-            />
+            <el-image :src="img" fit="cover" class="preview-img" :preview-src-list="imageList" :initial-index="index" />
             <div class="remove-btn" @click="removeImage(index)">
               <el-icon><Close /></el-icon>
             </div>
           </div>
           <!-- 如果不满9张，还可以继续添加的按钮 -->
           <el-upload
-             v-if="imageList.length < 9"
-             action="#"
-             :http-request="handleUploadImage"
-             :show-file-list="false"
-             :before-upload="beforeUpload"
-             accept="image/*"
-             class="add-more-uploader"
+            v-if="imageList.length < 9"
+            action="#"
+            :http-request="handleUploadImage"
+            :show-file-list="false"
+            :before-upload="beforeUpload"
+            accept="image/*"
+            class="add-more-uploader"
           >
-             <div class="add-more-btn">
-               <el-icon><Plus /></el-icon>
-             </div>
+            <div class="add-more-btn">
+              <el-icon><Plus /></el-icon>
+            </div>
           </el-upload>
         </div>
 
         <!-- 底部工具栏 -->
         <div class="publish-toolbar">
           <div class="left-icons">
-             <!-- 表情按钮 -->
-             <el-popover placement="top-start" :width="300" trigger="click">
-               <template #reference>
-                 <div class="icon-btn" title="插入表情">
-                    <span style="font-size: 20px; line-height: 1;">😊</span>
-                 </div>
-               </template>
-               <div class="emoji-picker">
-                 <span v-for="emoji in emojiList" :key="emoji" class="emoji-item" @click="addEmoji(emoji)">{{ emoji }}</span>
-               </div>
-             </el-popover>
- 
-             <!-- 图片上传按钮 (移到这里) -->
-             <el-upload
-               action="#"
-               :http-request="handleUploadImage"
-               :show-file-list="false"
-               :before-upload="beforeUpload"
-               accept="image/*"
-               multiple
-               :limit="9"
-               :on-exceed="handleExceed"
-               class="toolbar-uploader"
-             >
-               <div class="icon-btn" title="插入图片">
-                 <el-icon><Picture /></el-icon>
-               </div>
-             </el-upload>
+            <!-- 表情按钮 -->
+            <el-popover placement="top-start" :width="300" trigger="click">
+              <template #reference>
+                <div class="icon-btn" title="插入表情">
+                  <span style="font-size: 20px; line-height: 1">😊</span>
+                </div>
+              </template>
+              <div class="emoji-picker">
+                <span v-for="emoji in emojiList" :key="emoji" class="emoji-item" @click="addEmoji(emoji)">{{
+                  emoji
+                }}</span>
+              </div>
+            </el-popover>
+
+            <!-- 图片上传按钮 (移到这里) -->
+            <el-upload
+              action="#"
+              :http-request="handleUploadImage"
+              :show-file-list="false"
+              :before-upload="beforeUpload"
+              accept="image/*"
+              multiple
+              :limit="9"
+              :on-exceed="handleExceed"
+              class="toolbar-uploader"
+            >
+              <div class="icon-btn" title="插入图片">
+                <el-icon><Picture /></el-icon>
+              </div>
+            </el-upload>
           </div>
           <div class="right-actions">
-             <el-button type="primary" class="publish-btn" :loading="publishing" @click="handlePublish">发表</el-button>
+            <el-button type="primary" class="publish-btn" :loading="publishing" @click="handlePublish">发表</el-button>
           </div>
         </div>
       </div>
-      
+
       <!-- 动态列表 -->
       <div v-loading="loading" class="post-list">
         <div v-for="post in postList" :key="getPostId(post)" class="post-card">
-           <div class="post-header">
-             <el-avatar :size="40" :src="post.authorAvatar" class="post-avatar">
-               {{ (post.authorName || '').slice(0,1) }}
-             </el-avatar>
-             <div class="post-info">
-               <div class="post-name">{{ post.authorName }}</div>
-               <div class="post-time">{{ formatTime(post.createdTime) }}</div>
-             </div>
-             <div class="post-ops" v-if="sameId(post.authorId, userStore.userInfo?.id)">
-               <el-popconfirm title="确定删除这条动态吗？" confirm-button-text="删除" cancel-button-text="取消" @confirm="handleDeletePost(getPostId(post))">
-                 <template #reference>
-                   <el-button type="danger" class="delete-btn" :loading="deletingPostId === getPostId(post)">删除</el-button>
-                 </template>
-               </el-popconfirm>
-             </div>
-           </div>
-           <div class="post-content">{{ post.content }}</div>
-           <div class="post-images" v-if="post.images && post.images.length > 0">
-             <el-image 
-               v-for="(img, idx) in post.images" 
-               :key="idx" 
-               :src="img" 
-               :preview-src-list="post.images" 
-               :initial-index="idx"
-               fit="cover"
-               class="post-img-item"
-             />
-           </div>
-           <!-- 底部互动栏 (点赞/评论) - 暂时仅展示图标 -->
-           <div class="post-actions">
-              <button
-                type="button"
-                class="action-item like-action"
-                :class="{ liked: isPostLiked(post) }"
-                @click="handleToggleLike(post)"
+          <div class="post-header">
+            <el-avatar :size="40" :src="post.authorAvatar" class="post-avatar">
+              {{ (post.authorName || '').slice(0, 1) }}
+            </el-avatar>
+            <div class="post-info">
+              <div class="post-name">{{ post.authorName }}</div>
+              <div class="post-time">{{ formatTime(post.createdTime) }}</div>
+            </div>
+            <div class="post-ops" v-if="sameId(post.authorId, userStore.userInfo?.id)">
+              <el-popconfirm
+                title="确定删除这条动态吗？"
+                confirm-button-text="删除"
+                cancel-button-text="取消"
+                @confirm="handleDeletePost(getPostId(post))"
               >
-                <span class="like-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 7.59 6.41C7.22 6.78 7 7.3 7 7.83V19c0 1.1.9 2 2 2h8c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
-                  </svg>
-                </span>
-                <span v-if="post.likesCount > 0">{{ post.likesCount }}</span>
-                <span v-else>点赞</span>
-              </button>
-              <div class="action-item" @click="handleToggleComment(post)">
-                <el-icon><ChatDotRound /></el-icon>
-                <span v-if="post.commentsCount > 0">{{ post.commentsCount }}</span>
-                <span v-else>评论</span>
+                <template #reference>
+                  <el-button type="danger" class="delete-btn" :loading="deletingPostId === getPostId(post)"
+                    >删除</el-button
+                  >
+                </template>
+              </el-popconfirm>
+            </div>
+          </div>
+          <div class="post-content">{{ post.content }}</div>
+          <div class="post-images" v-if="post.images && post.images.length > 0">
+            <el-image
+              v-for="(img, idx) in post.images"
+              :key="idx"
+              :src="img"
+              :preview-src-list="post.images"
+              :initial-index="idx"
+              fit="cover"
+              class="post-img-item"
+            />
+          </div>
+          <!-- 底部互动栏 (点赞/评论) - 暂时仅展示图标 -->
+          <div class="post-actions">
+            <button
+              type="button"
+              class="action-item like-action"
+              :class="{ liked: isPostLiked(post) }"
+              @click="handleToggleLike(post)"
+            >
+              <span class="like-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 7.59 6.41C7.22 6.78 7 7.3 7 7.83V19c0 1.1.9 2 2 2h8c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"
+                  />
+                </svg>
+              </span>
+              <span v-if="post.likesCount > 0">{{ post.likesCount }}</span>
+              <span v-else>点赞</span>
+            </button>
+            <div class="action-item" @click="handleToggleComment(post)">
+              <el-icon><ChatDotRound /></el-icon>
+              <span v-if="post.commentsCount > 0">{{ post.commentsCount }}</span>
+              <span v-else>评论</span>
+            </div>
+          </div>
+
+          <!-- 评论区域 -->
+          <div class="comment-section" v-if="activeCommentPostId === getPostId(post)">
+            <!-- 评论输入框 -->
+            <div class="comment-input-area" v-if="activeCommentPostId === getPostId(post)">
+              <el-input
+                v-model="commentContent"
+                type="textarea"
+                :rows="2"
+                placeholder="写下你的评论..."
+                resize="none"
+                class="comment-input"
+              />
+              <div class="comment-btn-group">
+                <el-button type="primary" size="small" :loading="commentPublishing" @click="handlePublishComment(post)"
+                  >发送</el-button
+                >
               </div>
-           </div>
+            </div>
 
-           <!-- 评论区域 -->
-           <div class="comment-section" v-if="activeCommentPostId === getPostId(post)">
-             <!-- 评论输入框 -->
-             <div class="comment-input-area" v-if="activeCommentPostId === getPostId(post)">
-                <el-input 
-                  v-model="commentContent"
-                  type="textarea"
-                  :rows="2"
-                  placeholder="写下你的评论..."
-                  resize="none"
-                  class="comment-input"
-                />
-                <div class="comment-btn-group">
-                  <el-button type="primary" size="small" :loading="commentPublishing" @click="handlePublishComment(post)">发送</el-button>
+            <!-- 评论列表 -->
+            <div class="comment-list" v-if="post.comments && post.comments.length > 0">
+              <div v-for="comment in post.comments" :key="comment.id" class="comment-item">
+                <div class="comment-content-wrapper">
+                  <span class="comment-user">{{ comment.publishName || '未知用户' }}: </span>
+                  <span class="comment-text">{{ comment.content }}</span>
                 </div>
-             </div>
-
-             <!-- 评论列表 -->
-             <div class="comment-list" v-if="post.comments && post.comments.length > 0">
-               <div v-for="comment in post.comments" :key="comment.id" class="comment-item">
-                 <div class="comment-content-wrapper">
-                   <span class="comment-user">{{ comment.publishName || '未知用户' }}: </span>
-                   <span class="comment-text">{{ comment.content }}</span>
-                 </div>
-                 <div class="comment-actions" v-if="sameId(comment.publishId, userStore.userInfo?.id)">
-                    <el-popconfirm title="确定删除这条评论吗？" @confirm="handleDeleteComment(comment.id, post)">
-                      <template #reference>
-                        <el-icon class="delete-comment-icon"><Delete /></el-icon>
-                      </template>
-                    </el-popconfirm>
-                 </div>
-               </div>
-             </div>
-           </div>
+                <div class="comment-actions" v-if="sameId(comment.publishId, userStore.userInfo?.id)">
+                  <el-popconfirm title="确定删除这条评论吗？" @confirm="handleDeleteComment(comment.id, post)">
+                    <template #reference>
+                      <el-icon class="delete-comment-icon"><Delete /></el-icon>
+                    </template>
+                  </el-popconfirm>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <el-empty v-if="!loading && postList.length === 0" description="暂无更多动态" />
       </div>
@@ -198,21 +211,26 @@
           type="warning"
           :closable="false"
           show-icon
-          style="margin-bottom: 15px;"
+          style="margin-bottom: 15px"
         />
         <div v-loading="trashLoading" class="trash-list">
           <div v-for="post in deletedPostList" :key="getPostId(post)" class="trash-card">
             <div class="trash-header">
               <div class="trash-meta">
                 <el-avatar :size="36" :src="post.authorAvatar">
-                  {{ (post.authorName || '').slice(0,1) }}
+                  {{ (post.authorName || '').slice(0, 1) }}
                 </el-avatar>
                 <div class="trash-info">
                   <div class="trash-name">{{ post.authorName }}</div>
                   <div class="trash-time">{{ formatTime(post.createdTime) }}</div>
                 </div>
               </div>
-              <el-button type="primary" :loading="recoveringPostId === getPostId(post)" @click="handleRecoverPost(getPostId(post))">恢复</el-button>
+              <el-button
+                type="primary"
+                :loading="recoveringPostId === getPostId(post)"
+                @click="handleRecoverPost(getPostId(post))"
+                >恢复</el-button
+              >
             </div>
             <div class="trash-content">{{ post.content }}</div>
             <div class="trash-images" v-if="post.images && post.images.length > 0">
@@ -230,7 +248,6 @@
           <el-empty v-if="!trashLoading && deletedPostList.length === 0" description="回收站为空" />
         </div>
       </el-dialog>
-
     </div>
   </div>
 </template>
@@ -238,10 +255,21 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '../store/user'
-import { publishSpacePost, getFeedList, deleteSpacePost, getDeletedSpacePostList, recoverSpacePost, changeLikeStatus, publishSpaceComment, deleteSpaceComment, getSpaceCommentList } from '../api/space'
+import {
+  publishSpacePost,
+  getFeedList,
+  deleteSpacePost,
+  getDeletedSpacePostList,
+  recoverSpacePost,
+  changeLikeStatus,
+  publishSpaceComment,
+  deleteSpaceComment,
+  getSpaceCommentList
+} from '../api/space'
 import { uploadFileUnified } from '../api/upload'
 import { ElMessage } from 'element-plus'
 import { Picture, ChatDotRound, Delete } from '@element-plus/icons-vue'
+import logger from '../utils/logger'
 
 const userStore = useUserStore()
 const postContent = ref('')
@@ -297,7 +325,7 @@ const fetchPosts = async () => {
       syncLikedPostMap(posts)
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   } finally {
     loading.value = false
   }
@@ -319,12 +347,12 @@ const handleToggleLike = async (post) => {
   const currentCount = Number(post.likesCount || 0)
   const nextLiked = !wasLiked
   const delta = nextLiked ? 1 : -1
-  
+
   // Optimistic update
   likedPostMap.value = { ...likedPostMap.value, [postId]: nextLiked }
   post.liked = nextLiked
   post.likesCount = Math.max(0, currentCount + delta)
-  
+
   likeLoadingPostId.value = postId
   try {
     const res = await changeLikeStatus(postId)
@@ -333,7 +361,7 @@ const handleToggleLike = async (post) => {
     }
     // Success, keep optimistic state
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error(e.message || '点赞出错')
     // Revert
     likedPostMap.value = { ...likedPostMap.value, [postId]: wasLiked }
@@ -351,15 +379,96 @@ const formatTime = (timeStr) => {
 }
 
 const emojiList = [
-  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '☺️', '😊',
-  '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙',
-  '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎',
-  '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️',
-  '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡',
-  '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓',
-  '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄',
-  '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵',
-  '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠'
+  '😀',
+  '😃',
+  '😄',
+  '😁',
+  '😆',
+  '😅',
+  '😂',
+  '🤣',
+  '☺️',
+  '😊',
+  '😇',
+  '🙂',
+  '🙃',
+  '😉',
+  '😌',
+  '😍',
+  '🥰',
+  '😘',
+  '😗',
+  '😙',
+  '😚',
+  '😋',
+  '😛',
+  '😝',
+  '😜',
+  '🤪',
+  '🤨',
+  '🧐',
+  '🤓',
+  '😎',
+  '🤩',
+  '🥳',
+  '😏',
+  '😒',
+  '😞',
+  '😔',
+  '😟',
+  '😕',
+  '🙁',
+  '☹️',
+  '😣',
+  '😖',
+  '😫',
+  '😩',
+  '🥺',
+  '😢',
+  '😭',
+  '😤',
+  '😠',
+  '😡',
+  '🤬',
+  '🤯',
+  '😳',
+  '🥵',
+  '🥶',
+  '😱',
+  '😨',
+  '😰',
+  '😥',
+  '😓',
+  '🤗',
+  '🤔',
+  '🤭',
+  '🤫',
+  '🤥',
+  '😶',
+  '😐',
+  '😑',
+  '😬',
+  '🙄',
+  '😯',
+  '😦',
+  '😧',
+  '😮',
+  '😲',
+  '🥱',
+  '😴',
+  '🤤',
+  '😪',
+  '😵',
+  '🤐',
+  '🥴',
+  '🤢',
+  '🤮',
+  '🤧',
+  '😷',
+  '🤒',
+  '🤕',
+  '🤑',
+  '🤠'
 ]
 
 const addEmoji = (emoji) => {
@@ -379,8 +488,8 @@ const beforeUpload = (file) => {
     return false
   }
   if (imageList.value.length >= 9) {
-      ElMessage.warning('最多上传9张图片')
-      return false
+    ElMessage.warning('最多上传9张图片')
+    return false
   }
   return true
 }
@@ -393,7 +502,7 @@ const handleUploadImage = async (options) => {
     })
     imageList.value.push(result.fileUrl)
   } catch (error) {
-    console.error(error)
+    logger.error(error)
     ElMessage.error(error.message || '上传出错')
   }
 }
@@ -431,7 +540,7 @@ const handlePublish = async () => {
       ElMessage.error(res.msg || '发表失败')
     }
   } catch (error) {
-    console.error(error)
+    logger.error(error)
     ElMessage.error('发表出错')
   } finally {
     publishing.value = false
@@ -442,13 +551,13 @@ const loadComments = async (post) => {
   const postId = getPostId(post)
   try {
     const res = await getSpaceCommentList(postId)
-    console.log('加载评论结果:', postId, res)
+    logger.debug('加载评论结果:', postId, res)
     if (res.code === 1) {
       post.comments = res.data || []
-      console.log('赋值后的评论:', post.comments)
+      logger.debug('赋值后的评论:', post.comments)
     }
   } catch (e) {
-    console.error('加载评论失败:', e)
+    logger.error('加载评论失败:', e)
   }
 }
 
@@ -469,7 +578,7 @@ const handlePublishComment = async (post) => {
     ElMessage.warning('请输入评论内容')
     return
   }
-  
+
   commentPublishing.value = true
   try {
     const data = {
@@ -487,7 +596,7 @@ const handlePublishComment = async (post) => {
       ElMessage.error(res.msg || '评论失败')
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('评论出错')
   } finally {
     commentPublishing.value = false
@@ -505,7 +614,7 @@ const handleDeleteComment = async (commentId, post) => {
       ElMessage.error(res.msg || '删除失败')
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('删除出错')
   }
 }
@@ -530,7 +639,7 @@ const handleDeletePost = async (postId) => {
       }
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('删除出错')
   } finally {
     deletingPostId.value = null
@@ -548,7 +657,7 @@ const fetchDeletedPosts = async () => {
       ElMessage.error(res.msg || '获取回收站失败')
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('获取回收站出错')
   } finally {
     trashLoading.value = false
@@ -576,7 +685,7 @@ const handleRecoverPost = async (postId) => {
       ElMessage.error(res.msg || '恢复失败')
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('恢复出错')
   } finally {
     recoveringPostId.value = null
@@ -619,7 +728,7 @@ const handleRecoverPost = async (postId) => {
 
 .profile-avatar {
   border: 2px solid var(--el-bg-color);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin-right: 20px;
 }
 
@@ -630,13 +739,12 @@ const handleRecoverPost = async (postId) => {
   font-weight: 500;
 }
 
-
 /* 发布框卡片 */
 .publish-card {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .input-area {
@@ -686,7 +794,7 @@ const handleRecoverPost = async (postId) => {
   position: absolute;
   top: 0;
   right: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   color: #fff;
   width: 20px;
   height: 20px;
@@ -712,7 +820,6 @@ const handleRecoverPost = async (postId) => {
   border-color: var(--el-color-primary);
   color: var(--el-color-primary);
 }
-
 
 /* 底部工具栏 */
 .publish-toolbar {
@@ -794,7 +901,7 @@ const handleRecoverPost = async (postId) => {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   margin-bottom: 20px;
   padding: 20px;
 }

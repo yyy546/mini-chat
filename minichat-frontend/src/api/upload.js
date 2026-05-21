@@ -35,7 +35,7 @@ async function uploadUserAvatar(file, onProgress) {
   const formData = new FormData()
   formData.append('avatar', file)
   const res = await request.post('/users/avatar', formData, {
-    onUploadProgress: e => {
+    onUploadProgress: (e) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
@@ -57,7 +57,7 @@ async function uploadGroupAvatar(groupId, file, onProgress) {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
-    onUploadProgress: e => {
+    onUploadProgress: (e) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
@@ -79,7 +79,7 @@ async function uploadSpaceImage(file, onProgress) {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
-    onUploadProgress: e => {
+    onUploadProgress: (e) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
@@ -103,7 +103,7 @@ async function uploadChatSmallFile(scene, file, type, onProgress) {
     headers: {
       Accept: 'application/json'
     },
-    onUploadProgress: e => {
+    onUploadProgress: (e) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
@@ -171,7 +171,7 @@ async function uploadLargeFileWithResume(options) {
     form.append('file', chunk, file.name)
 
     await request.post('/upload/chunk', form, {
-      onUploadProgress: e => {
+      onUploadProgress: (e) => {
         if (!onProgress) return
         const loaded = e.total ? e.loaded : chunkSizeBytes
         const current = uploadedBytes + loaded
@@ -211,4 +211,3 @@ async function calcSimpleHash(file) {
   }
   return `${file.size}-${hash}`
 }
-

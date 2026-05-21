@@ -1,6 +1,6 @@
 <template>
   <el-container class="friend-page">
-  <el-aside width="280px" class="sidebar">
+    <el-aside width="280px" class="sidebar">
       <div class="sidebar-top">
         <div class="back-icon" @click="goBack">
           <el-icon><ArrowLeft /></el-icon>
@@ -19,8 +19,8 @@
         </el-tabs>
       </div>
       <div class="main-body">
-        <FriendSearchPanel v-if="active==='search'" />
-        <FriendRequestPanel v-else-if="active==='requests'" mode="incoming" />
+        <FriendSearchPanel v-if="active === 'search'" />
+        <FriendRequestPanel v-else-if="active === 'requests'" mode="incoming" />
         <FriendRequestPanel v-else mode="sent" />
       </div>
     </el-main>
@@ -35,7 +35,7 @@ import { useFriendStore } from '../store/friend'
 import FriendList from '../components/friend/FriendList.vue'
 import FriendRequestPanel from '../components/friend/FriendRequestPanel.vue'
 import FriendSearchPanel from '../components/friend/FriendSearchPanel.vue'
-import {ArrowLeft} from "@element-plus/icons-vue";
+import { ArrowLeft } from '@element-plus/icons-vue'
 
 const store = useFriendStore()
 const active = ref('search')
@@ -55,15 +55,52 @@ const goBack = () => {
 </script>
 
 <style scoped>
-.friend-page { height: calc(100vh - 20px); background: var(--el-bg-color-page); }
-.sidebar { background: var(--el-bg-color); border-right: 1px solid var(--el-border-color-light); display: flex; flex-direction: column; }
-.sidebar-top { padding: 12px; border-bottom: 1px solid var(--el-border-color-light); display: flex; align-items: center; gap: 8px; }
-.back-btn { padding: 4px 8px; }
-.title { font-weight: 600; color: var(--el-text-color-primary); }
-.main { background: var(--el-bg-color); }
-.main-top { border-bottom: 1px solid var(--el-border-color-light); }
-.main-body { padding: 12px; }
-.back-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 10px; }
-.back-icon:hover { background: var(--el-fill-color-light); }
-.back-icon :deep(svg) { font-size: 18px; }
+.friend-page {
+  height: calc(100vh - 20px);
+  background: var(--el-bg-color-page);
+}
+.sidebar {
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-top {
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.back-btn {
+  padding: 4px 8px;
+}
+.title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.main {
+  background: var(--el-bg-color);
+}
+.main-top {
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+.main-body {
+  padding: 12px;
+}
+.back-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.back-icon:hover {
+  background: var(--el-fill-color-light);
+}
+.back-icon :deep(svg) {
+  font-size: 18px;
+}
 </style>

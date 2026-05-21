@@ -1,24 +1,25 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    title="创建群聊"
-    width="500px"
-    @close="handleClose"
-    class="create-group-dialog"
-  >
+  <el-dialog v-model="visible" title="创建群聊" width="500px" @close="handleClose" class="create-group-dialog">
     <div class="create-group-container">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="80px" label-position="left">
         <el-form-item label="群名称" prop="groupName">
           <el-input v-model="form.groupName" placeholder="请输入群名称" maxlength="20" show-word-limit />
         </el-form-item>
-        
+
         <el-form-item label="群公告" prop="announcement">
-          <el-input v-model="form.announcement" type="textarea" :rows="2" placeholder="请输入群公告（选填）" maxlength="100" show-word-limit />
+          <el-input
+            v-model="form.announcement"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入群公告（选填）"
+            maxlength="100"
+            show-word-limit
+          />
         </el-form-item>
 
         <el-row :gutter="20">
           <el-col :span="12">
-             <el-form-item label="最大成员" prop="maxMembers">
+            <el-form-item label="最大成员" prop="maxMembers">
               <el-input-number v-model="form.maxMembers" :min="3" :max="200" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -50,14 +51,8 @@
         <div class="area-header">
           <span>选择好友 ({{ selectedMembers.length }})</span>
         </div>
-        <el-input 
-          v-model="searchKeyword" 
-          placeholder="搜索好友" 
-          prefix-icon="Search" 
-          clearable 
-          class="search-input" 
-        />
-        
+        <el-input v-model="searchKeyword" placeholder="搜索好友" prefix-icon="Search" clearable class="search-input" />
+
         <el-scrollbar height="250px" class="friend-list-scroll">
           <el-checkbox-group v-model="selectedMembers">
             <div v-for="friend in filteredFriends" :key="friend.id" class="friend-item-row">
@@ -75,7 +70,7 @@
         </el-scrollbar>
       </div>
     </div>
-    
+
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="visible = false">取消</el-button>
@@ -91,6 +86,7 @@ import { useFriendStore } from '../../store/friend'
 import { createGroup } from '../../api/group'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
+import logger from '../../utils/logger'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false }
@@ -111,7 +107,6 @@ watch(visible, async (val) => {
     await friendStore.fetchFriends()
   }
 })
-
 
 const form = reactive({
   groupName: '',
@@ -135,15 +130,16 @@ const searchKeyword = ref('')
 const filteredFriends = computed(() => {
   const friends = friendStore.friends || []
   // Filter out if type is 1 (group) just in case
-  const userFriends = friends.filter(f => f.type === 0 || f.type === undefined)
-  
+  const userFriends = friends.filter((f) => f.type === 0 || f.type === undefined)
+
   if (!searchKeyword.value) return userFriends
-  
+
   const k = searchKeyword.value.toLowerCase()
-  return userFriends.filter(f => 
-    (f.remark || '').toLowerCase().includes(k) ||
-    (f.nickname || '').toLowerCase().includes(k) ||
-    (f.name || '').toLowerCase().includes(k)
+  return userFriends.filter(
+    (f) =>
+      (f.remark || '').toLowerCase().includes(k) ||
+      (f.nickname || '').toLowerCase().includes(k) ||
+      (f.name || '').toLowerCase().includes(k)
   )
 })
 
@@ -173,7 +169,7 @@ const submit = async () => {
         emit('created', res.data)
         handleClose()
       } catch (e) {
-        console.error(e)
+        logger.error(e)
       } finally {
         loading.value = false
       }

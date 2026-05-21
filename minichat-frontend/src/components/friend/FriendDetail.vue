@@ -9,7 +9,7 @@
         </el-tooltip>
         <div class="profile-header">
           <div class="header-left">
-             <el-avatar :size="80" :src="friend.avatar" class="big-avatar">
+            <el-avatar :size="80" :src="friend.avatar" class="big-avatar">
               {{ getInitial(friend.nickname || friend.username) }}
             </el-avatar>
           </div>
@@ -21,26 +21,28 @@
               <span class="nickname-text">昵称: {{ friend.nickname }}</span>
             </div>
             <div class="sub-row">
-               <span class="qq">ID {{ friend.id || friend.userId }}</span>
-               <span class="status-badge" :class="{online: friend.online}"></span>
-               <span class="status-text">{{ friend.online ? '在线' : '离线' }}</span>
+              <span class="qq">ID {{ friend.id || friend.userId }}</span>
+              <span class="status-badge" :class="{ online: friend.online }"></span>
+              <span class="status-text">{{ friend.online ? '在线' : '离线' }}</span>
             </div>
           </div>
         </div>
 
         <div class="tags-row">
-          <span class="tag-item male" v-if="friend.gender === '男' || friend.gender === 'MALE' || friend.gender === '1'">♂ 男</span>
-          <span class="tag-item female" v-else-if="friend.gender === '女' || friend.gender === 'FEMALE' || friend.gender === '2'">♀ 女</span>
+          <span class="tag-item male" v-if="friend.gender === '男' || friend.gender === 'MALE' || friend.gender === '1'"
+            >♂ 男</span
+          >
+          <span
+            class="tag-item female"
+            v-else-if="friend.gender === '女' || friend.gender === 'FEMALE' || friend.gender === '2'"
+            >♀ 女</span
+          >
         </div>
 
         <div class="group-select-row">
           <el-icon class="row-icon"><User /></el-icon>
           <span class="label">好友分组</span>
-          <el-select 
-            v-model="selectedGroup" 
-            class="group-select"
-            @change="handleGroupChange"
-          >
+          <el-select v-model="selectedGroup" class="group-select" @change="handleGroupChange">
             <el-option
               v-for="group in groupList"
               :key="group.groupName"
@@ -48,20 +50,19 @@
               :value="group.groupName"
             />
             <el-option value="__ADD__" class="add-group-option">
-               <div class="add-group-content">
-                 <el-icon><Plus /></el-icon> <span>添加分组</span>
-               </div>
+              <div class="add-group-content">
+                <el-icon><Plus /></el-icon> <span>添加分组</span>
+              </div>
             </el-option>
           </el-select>
         </div>
-        
+
         <div class="action-buttons">
           <el-button class="action-btn" @click="onEditRemark">修改备注</el-button>
           <el-button class="action-btn primary" type="primary" @click="sendMessage">发消息</el-button>
           <el-button class="action-btn danger" type="danger" plain @click="onDeleteFriend">删除好友</el-button>
         </div>
       </div>
-
     </div>
     <div v-else class="empty-state">
       <el-empty description="请选择一位好友查看详情" />
@@ -80,64 +81,68 @@
 
     <!-- Space Posts Dialog -->
     <el-dialog v-model="spaceDialogVisible" title="好友动态" width="600px" append-to-body>
-      <div v-loading="loadingSpace" class="space-posts-list" style="max-height: 60vh; overflow-y: auto;">
+      <div v-loading="loadingSpace" class="space-posts-list" style="max-height: 60vh; overflow-y: auto">
         <el-empty v-if="!loadingSpace && spacePosts.length === 0" description="暂无动态" />
         <div v-for="post in spacePosts" :key="post.id" class="post-item">
           <div class="post-header">
-             <el-avatar :size="40" :src="post.authorAvatar" />
-             <div class="post-info">
-               <div class="post-author">{{ post.authorName }}</div>
-               <div class="post-time">{{ post.createdTime }}</div>
-             </div>
+            <el-avatar :size="40" :src="post.authorAvatar" />
+            <div class="post-info">
+              <div class="post-author">{{ post.authorName }}</div>
+              <div class="post-time">{{ post.createdTime }}</div>
+            </div>
           </div>
           <div class="post-content">{{ post.content }}</div>
           <div class="post-images" v-if="post.images && post.images.length">
-             <el-image 
-               v-for="(img, idx) in post.images" 
-               :key="idx" 
-               :src="img" 
-               :preview-src-list="post.images" 
-               class="post-img"
-               fit="cover"
-             />
+            <el-image
+              v-for="(img, idx) in post.images"
+              :key="idx"
+              :src="img"
+              :preview-src-list="post.images"
+              class="post-img"
+              fit="cover"
+            />
           </div>
           <div class="post-actions">
-             <button
-               type="button"
-               class="action-item like-action"
-               :class="{ liked: isPostLiked(post) }"
-               @click="handleToggleLike(post)"
-             >
-               <span class="like-icon" aria-hidden="true">
-                 <svg viewBox="0 0 24 24">
-                   <path d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 7.59 6.41C7.22 6.78 7 7.3 7 7.83V19c0 1.1.9 2 2 2h8c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
-                 </svg>
-               </span>
-               <span v-if="post.likesCount > 0">{{ post.likesCount }}</span>
-               <span v-else>点赞</span>
-             </button>
-             <div class="action-item" @click="handleToggleComment(post)">
-               <el-icon><ChatDotRound /></el-icon>
-               <span v-if="post.commentsCount > 0">{{ post.commentsCount }}</span>
-               <span v-else>评论</span>
-             </div>
+            <button
+              type="button"
+              class="action-item like-action"
+              :class="{ liked: isPostLiked(post) }"
+              @click="handleToggleLike(post)"
+            >
+              <span class="like-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13 1 7.59 6.41C7.22 6.78 7 7.3 7 7.83V19c0 1.1.9 2 2 2h8c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"
+                  />
+                </svg>
+              </span>
+              <span v-if="post.likesCount > 0">{{ post.likesCount }}</span>
+              <span v-else>点赞</span>
+            </button>
+            <div class="action-item" @click="handleToggleComment(post)">
+              <el-icon><ChatDotRound /></el-icon>
+              <span v-if="post.commentsCount > 0">{{ post.commentsCount }}</span>
+              <span v-else>评论</span>
+            </div>
           </div>
 
           <!-- 评论区域 -->
           <div class="comment-section" v-if="activeCommentPostId === getPostId(post)">
             <!-- 评论输入框 -->
             <div class="comment-input-area" v-if="activeCommentPostId === getPostId(post)">
-               <el-input 
-                 v-model="commentContent"
-                 type="textarea"
-                 :rows="2"
-                 placeholder="写下你的评论..."
-                 resize="none"
-                 class="comment-input"
-               />
-               <div class="comment-btn-group">
-                 <el-button type="primary" size="small" :loading="commentPublishing" @click="handlePublishComment(post)">发送</el-button>
-               </div>
+              <el-input
+                v-model="commentContent"
+                type="textarea"
+                :rows="2"
+                placeholder="写下你的评论..."
+                resize="none"
+                class="comment-input"
+              />
+              <div class="comment-btn-group">
+                <el-button type="primary" size="small" :loading="commentPublishing" @click="handlePublishComment(post)"
+                  >发送</el-button
+                >
+              </div>
             </div>
 
             <!-- 评论列表 -->
@@ -148,11 +153,11 @@
                   <span class="comment-text">{{ comment.content }}</span>
                 </div>
                 <div class="comment-actions" v-if="sameId(comment.publishId, userStore.userInfo?.id)">
-                   <el-popconfirm title="确定删除这条评论吗？" @confirm="handleDeleteComment(comment.id, post)">
-                     <template #reference>
-                       <el-icon class="delete-comment-icon"><Delete /></el-icon>
-                     </template>
-                   </el-popconfirm>
+                  <el-popconfirm title="确定删除这条评论吗？" @confirm="handleDeleteComment(comment.id, post)">
+                    <template #reference>
+                      <el-icon class="delete-comment-icon"><Delete /></el-icon>
+                    </template>
+                  </el-popconfirm>
                 </div>
               </div>
             </div>
@@ -169,9 +174,16 @@ import { computed, watch, ref, onMounted } from 'vue'
 import { useFriendStore } from '../../store/friend'
 import { useChatStore } from '../../store/chat'
 import { useUserStore } from '../../store/user'
-import { getSpacePostList, changeLikeStatus, publishSpaceComment, deleteSpaceComment, getSpaceCommentList } from '../../api/space'
+import {
+  getSpacePostList,
+  changeLikeStatus,
+  publishSpaceComment,
+  deleteSpaceComment,
+  getSpaceCommentList
+} from '../../api/space'
 import { Star, Edit, ChatDotRound, User, ArrowDown, ArrowRight, Plus, Picture, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import logger from '../../utils/logger'
 
 const props = defineProps({
   friendId: { type: [Number, String], default: null }
@@ -228,12 +240,12 @@ const handleToggleLike = async (post) => {
   const currentCount = Number(post.likesCount || 0)
   const nextLiked = !wasLiked
   const delta = nextLiked ? 1 : -1
-  
+
   // Optimistic update
   likedPostMap.value = { ...likedPostMap.value, [postId]: nextLiked }
   post.liked = nextLiked
   post.likesCount = Math.max(0, currentCount + delta)
-  
+
   likeLoadingPostId.value = postId
 
   try {
@@ -243,7 +255,7 @@ const handleToggleLike = async (post) => {
     }
     // Success, keep optimistic state
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error(e.message || '点赞出错')
     // Revert
     likedPostMap.value = { ...likedPostMap.value, [postId]: wasLiked }
@@ -262,7 +274,7 @@ const loadComments = async (post) => {
       post.comments = res.data || []
     }
   } catch (e) {
-    console.error('加载评论失败:', e)
+    logger.error('加载评论失败:', e)
   }
 }
 
@@ -283,7 +295,7 @@ const handlePublishComment = async (post) => {
     ElMessage.warning('请输入评论内容')
     return
   }
-  
+
   commentPublishing.value = true
   try {
     const data = {
@@ -301,7 +313,7 @@ const handlePublishComment = async (post) => {
       ElMessage.error(res.msg || '评论失败')
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('评论出错')
   } finally {
     commentPublishing.value = false
@@ -319,7 +331,7 @@ const handleDeleteComment = async (commentId, post) => {
       ElMessage.error(res.msg || '删除失败')
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
     ElMessage.error('删除出错')
   }
 }
@@ -344,7 +356,7 @@ const handleShowSpace = async () => {
       syncLikedPostMap(posts)
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   } finally {
     loadingSpace.value = false
   }
@@ -354,31 +366,37 @@ onMounted(() => {
   store.fetchFriendGroups()
 })
 
-watch(() => friend.value, (newVal) => {
-  if (newVal) {
-    selectedGroup.value = newVal.groupName || '我的好友'
-  }
-}, { immediate: true })
+watch(
+  () => friend.value,
+  (newVal) => {
+    if (newVal) {
+      selectedGroup.value = newVal.groupName || '我的好友'
+    }
+  },
+  { immediate: true }
+)
 
 const handleGroupChange = (val) => {
   if (val === '__ADD__') {
     // Reset to previous value visually until confirmed
     selectedGroup.value = friend.value.groupName || '我的好友'
-    
+
     ElMessageBox.prompt('请输入新的分组名称', '添加分组', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       inputPattern: /\S/,
       inputErrorMessage: '分组名称不能为空'
-    }).then(async ({ value }) => {
-      if (!friend.value) return
-      const id = friend.value.id || friend.value.userId
-      await store.changeFriendGroup(id, value)
-      // Optimistic update or wait for store fetch
-      selectedGroup.value = value
-    }).catch(() => {
-       // cancel
     })
+      .then(async ({ value }) => {
+        if (!friend.value) return
+        const id = friend.value.id || friend.value.userId
+        await store.changeFriendGroup(id, value)
+        // Optimistic update or wait for store fetch
+        selectedGroup.value = value
+      })
+      .catch(() => {
+        // cancel
+      })
   } else {
     if (!friend.value) return
     const id = friend.value.id || friend.value.userId
@@ -386,13 +404,17 @@ const handleGroupChange = (val) => {
   }
 }
 
-watch(() => props.friendId, (newId) => {
-  if (newId) {
-    store.fetchFriendDetail(newId)
-  } else {
-    store.currentFriendDetail = null
-  }
-}, { immediate: true })
+watch(
+  () => props.friendId,
+  (newId) => {
+    if (newId) {
+      store.fetchFriendDetail(newId)
+    } else {
+      store.currentFriendDetail = null
+    }
+  },
+  { immediate: true }
+)
 
 const getInitial = (name) => (name || '').slice(0, 1).toUpperCase()
 
@@ -426,15 +448,11 @@ const confirmRemark = async () => {
 
 const onDeleteFriend = () => {
   if (!friend.value) return
-  ElMessageBox.confirm(
-    '你真的要删除该好友吗？删除后将无法恢复。',
-    '删除确认',
-    {
-      confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }
-  )
+  ElMessageBox.confirm('你真的要删除该好友吗？删除后将无法恢复。', '删除确认', {
+    confirmButtonText: '确定删除',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
     .then(async () => {
       const id = friend.value.id || friend.value.userId
       await store.deleteFriend(id)
@@ -644,11 +662,17 @@ const onDeleteFriend = () => {
   justify-content: flex-end;
 }
 
-.friend-detail-container { height: 100%; background: var(--el-bg-color-page); display: flex; flex-direction: column; overflow: hidden; }
-.friend-detail { 
-  flex: 1; 
-  overflow-y: auto; 
-  padding: 40px; 
+.friend-detail-container {
+  height: 100%;
+  background: var(--el-bg-color-page);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.friend-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
   background: var(--el-bg-color-page);
   display: flex;
   align-items: center;
@@ -660,47 +684,146 @@ const onDeleteFriend = () => {
   max-width: 600px;
   background: var(--el-bg-color);
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   padding: 40px;
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
-.profile-header { display: flex; gap: 20px; margin-bottom: 20px; align-items: flex-start; }
-.header-left { }
-.big-avatar { border: 2px solid var(--el-bg-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.profile-header {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  align-items: flex-start;
+}
+.header-left {
+}
+.big-avatar {
+  border: 2px solid var(--el-bg-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 
-.header-right { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-.name-row { font-size: 24px; font-weight: bold; color: var(--el-text-color-primary); margin-bottom: 8px; }
-.sub-row { display: flex; align-items: center; gap: 8px; color: var(--el-text-color-regular); font-size: 14px; }
-.qq { margin-right: 4px; }
-.status-badge { width: 10px; height: 10px; border-radius: 50%; background: #ccc; }
-.status-badge.online { background: #18d070; }
-.status-text { margin-right: 12px; }
-.nickname-row { font-size: 14px; color: var(--el-text-color-secondary); margin-bottom: 6px; }
+.header-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.name-row {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--el-text-color-primary);
+  margin-bottom: 8px;
+}
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+}
+.qq {
+  margin-right: 4px;
+}
+.status-badge {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ccc;
+}
+.status-badge.online {
+  background: #18d070;
+}
+.status-text {
+  margin-right: 12px;
+}
+.nickname-row {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 6px;
+}
 
-.tags-row { display: flex; gap: 8px; margin-bottom: 24px; font-size: 14px; color: var(--el-text-color-regular); padding-left: 100px; }
-.tag-item { padding: 0 4px; }
-.tag-item.male { color: var(--el-color-primary); }
-.tag-item.female { color: #F56C6C; }
+.tags-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+  padding-left: 100px;
+}
+.tag-item {
+  padding: 0 4px;
+}
+.tag-item.male {
+  color: var(--el-color-primary);
+}
+.tag-item.female {
+  color: #f56c6c;
+}
 
 .group-select-row {
-  display: flex; align-items: center; background: var(--el-fill-color-lighter); padding: 16px 20px;
-  margin-bottom: 30px; border-radius: 8px;
+  display: flex;
+  align-items: center;
+  background: var(--el-fill-color-lighter);
+  padding: 16px 20px;
+  margin-bottom: 30px;
+  border-radius: 8px;
 }
-.row-icon { margin-right: 12px; font-size: 18px; color: var(--el-text-color-regular); }
-.label { flex: 1; font-size: 15px; color: var(--el-text-color-primary); }
-.value { color: #666; font-size: 14px; margin-right: 8px; }
-.arrow-icon, .arrow-right { color: #999; }
+.row-icon {
+  margin-right: 12px;
+  font-size: 18px;
+  color: var(--el-text-color-regular);
+}
+.label {
+  flex: 1;
+  font-size: 15px;
+  color: var(--el-text-color-primary);
+}
+.value {
+  color: #666;
+  font-size: 14px;
+  margin-right: 8px;
+}
+.arrow-icon,
+.arrow-right {
+  color: #999;
+}
 
-.action-buttons { display: flex; gap: 16px; margin-top: 10px; justify-content: center; flex-wrap: wrap; }
-.action-btn { width: 120px; height: 40px; border-radius: 20px; font-size: 15px; }
-.action-btn.primary { background: var(--el-color-primary); border-color: var(--el-color-primary); }
-.action-btn.danger { }
+.action-buttons {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.action-btn {
+  width: 120px;
+  height: 40px;
+  border-radius: 20px;
+  font-size: 15px;
+}
+.action-btn.primary {
+  background: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+}
+.action-btn.danger {
+}
 
-.group-select { width: 150px; }
-.add-group-content { display: flex; align-items: center; color: var(--el-color-primary); justify-content: center; }
+.group-select {
+  width: 150px;
+}
+.add-group-content {
+  display: flex;
+  align-items: center;
+  color: var(--el-color-primary);
+  justify-content: center;
+}
 
-.empty-state { height: 100%; display: flex; align-items: center; justify-content: center; }
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>

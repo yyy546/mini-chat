@@ -4,13 +4,11 @@
       <el-skeleton :rows="3" animated />
     </div>
     <el-scrollbar v-else>
-      <div v-if="filteredGroups.length === 0" class="empty-list">
-        暂无加入的群组
-      </div>
-      <div 
-        v-for="item in filteredGroups" 
-        :key="item.id" 
-        class="list-item" 
+      <div v-if="filteredGroups.length === 0" class="empty-list">暂无加入的群组</div>
+      <div
+        v-for="item in filteredGroups"
+        :key="item.id"
+        class="list-item"
         :class="{ active: activeId === item.id }"
         @click="onSelect(item)"
       >
@@ -28,6 +26,7 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue'
 import { getGroupList } from '../../api/group'
+import logger from '../../utils/logger'
 
 const props = defineProps({
   activeId: {
@@ -47,7 +46,7 @@ const loading = ref(false)
 const filteredGroups = computed(() => {
   if (!props.filterText) return groups.value
   const k = props.filterText.toLowerCase()
-  return groups.value.filter(g => (g.groupName || '').toLowerCase().includes(k))
+  return groups.value.filter((g) => (g.groupName || '').toLowerCase().includes(k))
 })
 
 const fetchGroups = async () => {
@@ -58,7 +57,7 @@ const fetchGroups = async () => {
       groups.value = res.data
     }
   } catch (e) {
-    console.error(e)
+    logger.error(e)
   } finally {
     loading.value = false
   }
@@ -78,15 +77,45 @@ const getInitial = (name) => {
 </script>
 
 <style scoped>
-.group-list { height: 100%; display: flex; flex-direction: column; background: var(--el-bg-color); }
-.loading { padding: 20px; }
-.empty-list { padding: 20px; text-align: center; color: var(--el-text-color-secondary); font-size: 14px; }
+.group-list {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color);
+}
+.loading {
+  padding: 20px;
+}
+.empty-list {
+  padding: 20px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
 .list-item {
-  display: flex; align-items: center; padding: 10px 20px; cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  cursor: pointer;
   transition: background 0.2s;
 }
-.list-item:hover, .list-item.active { background: var(--el-fill-color-light); }
-.avatar-wrap { position: relative; margin-right: 12px; }
-.info { flex: 1; overflow: hidden; }
-.name { font-size: 14px; color: var(--el-text-color-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item:hover,
+.list-item.active {
+  background: var(--el-fill-color-light);
+}
+.avatar-wrap {
+  position: relative;
+  margin-right: 12px;
+}
+.info {
+  flex: 1;
+  overflow: hidden;
+}
+.name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>

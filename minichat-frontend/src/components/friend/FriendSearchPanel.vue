@@ -1,12 +1,19 @@
 <template>
   <div class="search-panel">
-    <el-input v-model="keyword" placeholder="输入用户名/昵称搜索" clearable @input="onInput" size="large" class="panel-search">
+    <el-input
+      v-model="keyword"
+      placeholder="输入用户名/昵称搜索"
+      clearable
+      @input="onInput"
+      size="large"
+      class="panel-search"
+    >
       <template #prefix>
         <el-icon><Search /></el-icon>
       </template>
     </el-input>
 
-    <el-skeleton :loading="store.loading" animated :count="3" style="margin-top:12px">
+    <el-skeleton :loading="store.loading" animated :count="3" style="margin-top: 12px">
       <template #template>
         <el-skeleton-item variant="text" style="width: 60%" />
         <el-skeleton-item variant="text" style="width: 40%" />
@@ -24,7 +31,13 @@
               </div>
             </div>
             <div class="right">
-              <el-button size="small" type="primary" @click="openApply(u)" :loading="sending && selectedUser?.id===u.id">加好友</el-button>
+              <el-button
+                size="small"
+                type="primary"
+                @click="openApply(u)"
+                :loading="sending && selectedUser?.id === u.id"
+                >加好友</el-button
+              >
             </div>
           </el-card>
           <el-empty v-if="!store.searchResults.length && keyword" description="未搜索到用户" />
@@ -37,7 +50,7 @@
         <el-input v-model="verifyMsg" type="textarea" :rows="4" placeholder="请输入验证信息" />
       </div>
       <template #footer>
-        <el-button @click="showDialog=false">取消</el-button>
+        <el-button @click="showDialog = false">取消</el-button>
         <el-button type="primary" :loading="sending" @click="doSend">发送</el-button>
       </template>
     </el-dialog>
@@ -83,13 +96,40 @@ const getInitial = (name = '') => name.slice(0, 1).toUpperCase()
 </script>
 
 <style scoped>
-.panel-search :deep(.el-input__wrapper) { height: 40px; border-radius: 10px; }
-.panel-search :deep(.el-input__inner) { font-size: 14px; }
-.result-item { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
-.left { display: flex; align-items: center; }
-.avatar-wrap { margin-right: 10px; }
-.name { font-size: 14px; color: var(--el-text-color-primary); }
-.sub { font-size: 12px; color: var(--el-text-color-secondary); }
-.verify-box { margin: 8px 0; }
-.label { font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 6px; }
+.panel-search :deep(.el-input__wrapper) {
+  height: 40px;
+  border-radius: 10px;
+}
+.panel-search :deep(.el-input__inner) {
+  font-size: 14px;
+}
+.result-item {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.left {
+  display: flex;
+  align-items: center;
+}
+.avatar-wrap {
+  margin-right: 10px;
+}
+.name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+.sub {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.verify-box {
+  margin: 8px 0;
+}
+.label {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  margin-bottom: 6px;
+}
 </style>
