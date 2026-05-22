@@ -14,7 +14,9 @@
     "format": "prettier --write \"src/**/*.{js,ts,vue,css,json}\"",
     "lint:check": "eslint . --ext .js,.ts,.vue",
     "format:check": "prettier --check \"src/**/*.{js,ts,vue,css,json}\"",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -30,14 +32,17 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.1",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.10",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.9.1",
     "globals": "^17.6.0",
+    "happy-dom": "^20.9.0",
     "prettier": "^3.8.3",
     "rimraf": "^6.1.2",
     "typescript": "^6.0.3",
     "vite": "^7.1.7",
+    "vitest": "^4.1.7",
     "vue-tsc": "^3.3.1"
   }
 }
