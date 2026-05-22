@@ -1,5 +1,7 @@
 export class BusinessError extends Error {
-  constructor(code, message) {
+  code: number
+
+  constructor(code: number, message: string) {
     super(message)
     this.name = 'BusinessError'
     this.code = code
@@ -7,7 +9,7 @@ export class BusinessError extends Error {
 }
 
 export class AuthError extends Error {
-  constructor(message = '登录已过期') {
+  constructor(message: string = '登录已过期') {
     super(message)
     this.name = 'AuthError'
   }

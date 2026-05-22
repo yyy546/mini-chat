@@ -7,9 +7,31 @@ import { useUserStore } from './user'
 import { useWebSocketStore } from './chat/useWebSocketStore'
 import { useMessageActions } from './chat/useMessageActions'
 import logger from '../utils/logger'
+import type { UIMessage } from '../types/message'
+import type { Session } from '../types/session'
+
+interface ChatPagination {
+  page: number
+  hasMore: boolean
+  loading: boolean
+}
+
+interface ActiveUser {
+  id: number
+  type: number
+  [key: string]: unknown
+}
+
+interface ChatState {
+  activeUser: ActiveUser | null
+  messagesByUser: Record<string, UIMessage[]>
+  chatPagination: Record<string, ChatPagination>
+  sessions: Session[]
+  sessionLoading: boolean
+}
 
 export const useChatStore = defineStore('chat', {
-  state: () => ({
+  state: (): ChatState => ({
     activeUser: null,
     messagesByUser: {},
     chatPagination: {},
@@ -18,7 +40,7 @@ export const useChatStore = defineStore('chat', {
   }),
 
   getters: {
-    activeMessages(state) {
+    activeMessages(state: ChatState): UIMessage[] {
       if (!state.activeUser) return []
       const id = state.activeUser.id
       const type = state.activeUser.type || 0
@@ -26,26 +48,24 @@ export const useChatStore = defineStore('chat', {
       return state.messagesByUser[key] || []
     },
 
-    isConnected() {
+    isConnected(): boolean {
       const wsStore = useWebSocketStore()
-      return wsStore.connected && wsStore.stomp && wsStore.stomp.connected
+      return wsStore.connected && !!wsStore.stomp && !!wsStore.stomp.connected
     }
   },
 
   actions: {
-    // ---- 会话管理 ----
-
     async fetchSessions() {
       this.sessionLoading = true
       try {
-        let list = await getSessionList()
+        let list: unknown[] = await getSessionList()
         list = Array.isArray(list) ? list : []
 
         try {
-          const friendList = await getFriendList()
-          const validFriendIds = new Set()
-          ;(Array.isArray(friendList) ? friendList : []).forEach((friend) => {
-            const friendId = friend.friendId ?? friend.friend_id ?? friend.userId ?? friend.id
+          const friendList: unknown[] = await getFriendList()
+          const validFriendIds = new Set<number | string>()
+          ;(Array.isArray(friendList) ? friendList : []).forEach((friend: Record<string, unknown>) => {
+            const friendId = (friend.friendId ?? friend.friend_id ?? friend.userId ?? friend.id) as number
             if (friendId) {
               validFriendIds.add(friendId)
               validFriendIds.add(String(friendId))
@@ -53,31 +73,32 @@ export const useChatStore = defineStore('chat', {
             }
           })
 
-          list = list.filter((session) => {
-            const sessionType = session.type || 0
+          list = list.filter((session: Record<string, unknown>) => {
+            const sessionType = (session.type as number) || 0
             if (sessionType === 1) {
               return true
             }
-            const sessionId = session.id
+            const sessionId = session.id as number
             return (
               validFriendIds.has(sessionId) ||
               validFriendIds.has(String(sessionId)) ||
               validFriendIds.has(Number(sessionId))
             )
           })
-        } catch (friendErr) {
+        } catch (friendErr: unknown) {
           logger.warn('获取好友列表失败，将显示所有会话:', friendErr)
         }
 
-        this.sessions = list
+        this.sessions = (list as Record<string, unknown>[])
           .map((session) => ({
-            ...session,
-            id: session.id,
-            type: session.type || 0,
-            name: session.name || '',
-            avatar: session.avatar || '',
-            lastMessageTime: session.lastMessageTime ? new Date(session.lastMessageTime).getTime() : 0,
-            unreadCount: session.unreadCount || 0
+            id: session.id as number,
+            type: ((session.type as number) || 0) as 0 | 1,
+            name: (session.name as string) || '',
+            avatar: (session.avatar as string) || '',
+            lastMessageTime: session.lastMessageTime
+              ? new Date(session.lastMessageTime as string).getTime()
+              : 0,
+            unreadCount: (session.unreadCount as number) || 0
           }))
           .sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
 
@@ -85,7 +106,7 @@ export const useChatStore = defineStore('chat', {
         if (wsStore.isConnected) {
           wsStore._subscribeAllGroups()
         }
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('获取会话列表失败:', e)
         ElMessage.error('获取会话列表失败')
         this.sessions = []
@@ -94,7 +115,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async setActiveUser(user) {
+    async setActiveUser(user: ActiveUser | null) {
       this.activeUser = user
       if (!user) return
       const id = user.id
@@ -114,7 +135,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async markAsRead(targetId, type = 0) {
+    async markAsRead(targetId: number, type: number = 0) {
       if (!targetId) return
       try {
         if (type === 1) {
@@ -134,12 +155,12 @@ export const useChatStore = defineStore('chat', {
         }
 
         logger.debug('已标记消息为已读，对象ID:', targetId, '类型:', type)
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('标记已读失败:', e)
       }
     },
 
-    async loadHistory(userId, sessionType = 0, isLoadMore = false) {
+    async loadHistory(userId: number, sessionType: number = 0, isLoadMore: boolean = false) {
       const userStore = useUserStore()
       const selfId = userStore.userInfo?.id
       const key = `${sessionType === 1 ? 'group' : 'private'}_${userId}`
@@ -151,7 +172,6 @@ export const useChatStore = defineStore('chat', {
       const pagination = this.chatPagination[key]
 
       if (isLoadMore && !pagination.hasMore) return
-
       if (pagination.loading) return
       pagination.loading = true
 
@@ -164,36 +184,41 @@ export const useChatStore = defineStore('chat', {
       const pageSize = 50
 
       try {
-        let rawList = []
+        let rawList: Record<string, unknown>[] = []
         let total = 0
 
         if (sessionType === 1) {
           const res = await getGroupMessageHistory(userId, pageToLoad, pageSize)
-          rawList = res?.records || []
-          total = res?.total || 0
-          pagination.hasMore = (res?.current || 0) * (res?.size || 0) < total
+          const data = res as unknown as Record<string, unknown>
+          rawList = (data?.records as Record<string, unknown>[]) || []
+          total = (data?.total as number) || 0
+          pagination.hasMore = ((data?.current as number) || 0) * ((data?.size as number) || 0) < total
         } else {
           const res = await getPrivateMessageHistory(userId, pageToLoad, pageSize)
-          rawList = res?.records || []
-          total = res?.total || 0
-          pagination.hasMore = (res?.current || 0) * (res?.size || 0) < total
+          const data = res as unknown as Record<string, unknown>
+          rawList = (data?.records as Record<string, unknown>[]) || []
+          total = (data?.total as number) || 0
+          pagination.hasMore = ((data?.current as number) || 0) * ((data?.size as number) || 0) < total
         }
 
-        const list = rawList.map((m) => {
-          const msgObj = {
-            id: m.messageId || `hist_${Date.now()}_${Math.random()}`,
-            fromId: m.senderId === selfId ? 'self' : m.senderId,
-            toId: m.receiverId,
+        const list: UIMessage[] = rawList.map((m) => {
+          const msgObj: UIMessage = {
+            id: (m.messageId as number) || `hist_${Date.now()}_${Math.random()}`,
+            fromId: m.senderId === selfId ? 'self' : (m.senderId as number),
+            toId: m.receiverId as number,
             groupId: sessionType === 1 ? userId : undefined,
-            content: m.content,
-            timestamp: m.sendTime ? new Date(m.sendTime).getTime() : Date.now(),
-            type: m.messageType || 1,
-            fileName: m.fileName,
-            fileSize: m.fileSize,
-            fileUrl: m.fileUrl,
-            senderAvatar: m.senderAvatar,
-            senderNickname: m.senderNickname,
-            messageSeq: m.messageSeq
+            content: m.content as string,
+            timestamp: m.sendTime ? new Date(m.sendTime as string).getTime() : Date.now(),
+            type: (m.messageType as 1 | 2 | 3 | 5) || 1,
+            fileName: m.fileName as string | undefined,
+            fileSize: m.fileSize as number | undefined,
+            fileUrl: m.fileUrl as string | undefined,
+            senderAvatar: m.senderAvatar as string | undefined,
+            senderNickname: m.senderNickname as string | undefined,
+            messageSeq: m.messageSeq as number | undefined,
+            isSending: false,
+            isReceived: true,
+            sendError: false
           }
           if (msgObj.type === 5) {
             msgObj.content =
@@ -220,7 +245,7 @@ export const useChatStore = defineStore('chat', {
             pagination.page = 2
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('加载历史消息失败:', e)
         if (!isLoadMore) {
           this.messagesByUser[key] = []
@@ -230,7 +255,13 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    _updateSession(sessionId, timestamp, incrementUnread = false, isGroup = false, messageSeq = null) {
+    _updateSession(
+      sessionId: number,
+      timestamp: number,
+      incrementUnread: boolean = false,
+      isGroup: boolean = false,
+      messageSeq: number | null = null
+    ) {
       const type = isGroup ? 1 : 0
       const sessionIndex = this.sessions.findIndex((s) => s.id == sessionId && (s.type || 0) === type)
 
@@ -268,33 +299,29 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    // ---- 委托给 useMessageActions ----
-
-    sendMessage(toUserId, content, type, fileName, fileSize, fileUrl) {
+    sendMessage(toUserId: number, content: string, type?: number, fileName?: string, fileSize?: number, fileUrl?: string) {
       return useMessageActions().sendMessage(toUserId, content, type, fileName, fileSize, fileUrl)
     },
 
-    sendGroupMessage(groupId, content, type, fileName, fileSize, fileUrl) {
+    sendGroupMessage(groupId: number, content: string, type?: number, fileName?: string, fileSize?: number, fileUrl?: string) {
       return useMessageActions().sendGroupMessage(groupId, content, type, fileName, fileSize, fileUrl)
     },
 
-    _handleIncoming(payload) {
+    _handleIncoming(payload: Record<string, unknown>) {
       return useMessageActions()._handleIncoming(payload)
     },
 
-    _handleGroupMessage(payload) {
+    _handleGroupMessage(payload: Record<string, unknown>) {
       return useMessageActions()._handleGroupMessage(payload)
     },
 
-    _handleRecallNotification(payload) {
+    _handleRecallNotification(payload: Record<string, unknown>) {
       return useMessageActions()._handleRecallNotification(payload)
     },
 
-    recallMessage(messageId) {
+    recallMessage(messageId: number) {
       return useMessageActions().recallMessage(messageId)
     },
-
-    // ---- 委托给 useWebSocketStore ----
 
     connect() {
       return useWebSocketStore().connect()
@@ -312,7 +339,7 @@ export const useChatStore = defineStore('chat', {
       return useWebSocketStore().checkConnectionStatus()
     },
 
-    testSendMessage(toUserId) {
+    testSendMessage(toUserId: number) {
       return useWebSocketStore().testSendMessage(toUserId)
     }
   }

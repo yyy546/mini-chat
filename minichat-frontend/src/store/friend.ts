@@ -7,7 +7,6 @@ import {
   getSentRequests,
   handleFriendRequest,
   getFriendList,
-  setFriendRemark,
   updateFriendRemark,
   getFriendGroupList,
   getFriendGroupItemList,
@@ -19,14 +18,66 @@ import { batchCheckUserOnlineStatus } from '../api/userStatus'
 import { useChatStore } from './chat'
 import logger from '../utils/logger'
 
+interface FriendItem {
+  relationId?: number
+  id: number
+  friendId?: number
+  userId?: number
+  uid?: number
+  username?: string
+  nickname?: string
+  avatar?: string
+  remark?: string
+  remarkName?: string
+  online: boolean
+  [key: string]: unknown
+}
+
+interface FriendRequestItem {
+  id: number
+  [key: string]: unknown
+}
+
+interface FriendGroup {
+  groupName: string
+  items: FriendItem[]
+  expanded: boolean
+  loaded: boolean
+  [key: string]: unknown
+}
+
+interface FriendDetail {
+  id: number
+  userId?: number
+  avatar?: string
+  remark?: string
+  nickname?: string
+  groupName?: string
+  gender?: string
+  signature?: string
+  online: boolean
+  [key: string]: unknown
+}
+
+interface FriendState {
+  friends: FriendItem[]
+  incomingRequests: FriendRequestItem[]
+  sentRequests: FriendRequestItem[]
+  searchResults: unknown[]
+  groups: FriendGroup[]
+  currentFriendDetail: FriendDetail | null
+  loading: boolean
+  requestLoading: boolean
+}
+
 export const useFriendStore = defineStore('friend', {
-  state: () => ({
+  state: (): FriendState => ({
     friends: [],
     incomingRequests: [],
     sentRequests: [],
     searchResults: [],
-    groups: [], // 好友分组列表
-    currentFriendDetail: null, // 当前选中的好友详情
+    groups: [],
+    currentFriendDetail: null,
     loading: false,
     requestLoading: false
   }),
@@ -37,18 +88,18 @@ export const useFriendStore = defineStore('friend', {
       try {
         const res = await getFriendList()
         const list = Array.isArray(res) ? res : []
-        const normalize = (raw) => {
-          const friendId = raw.friendId ?? raw.friend_id ?? raw.userId ?? raw.uid
+        const normalize = (raw: Record<string, unknown>) => {
+          const friendId = (raw.friendId ?? raw.friend_id ?? raw.userId ?? raw.uid ?? raw.id) as number
           return {
             ...raw,
             relationId: raw.id,
-            friendId: friendId ?? raw.id,
-            id: friendId ?? raw.id,
-            remark: raw.remark || raw.remarkName,
+            friendId,
+            id: friendId,
+            remark: (raw.remark || raw.remarkName) as string | undefined,
             online: false
-          }
+          } as FriendItem
         }
-        this.friends = Array.isArray(list) ? list.map(normalize) : []
+        this.friends = Array.isArray(list) ? (list as unknown as Record<string, unknown>[]).map(normalize) : []
 
         if (this.friends.length > 0) {
           const ids = this.friends.map((f) => f.id)
@@ -60,11 +111,11 @@ export const useFriendStore = defineStore('friend', {
                 online: !!statusMap[f.id]
               }))
             }
-          } catch (err) {
+          } catch (err: unknown) {
             logger.error('Failed to fetch online status', err)
           }
         }
-      } catch (e) {
+      } catch {
         ElMessage.error('获取好友列表失败')
       } finally {
         this.loading = false
@@ -75,8 +126,8 @@ export const useFriendStore = defineStore('friend', {
       this.requestLoading = true
       try {
         const res = await getIncomingRequests()
-        this.incomingRequests = res
-      } catch (e) {
+        this.incomingRequests = (res as FriendRequestItem[]) || []
+      } catch {
         ElMessage.error('获取好友申请失败')
       } finally {
         this.requestLoading = false
@@ -86,20 +137,16 @@ export const useFriendStore = defineStore('friend', {
     async fetchSentRequests() {
       try {
         const res = await getSentRequests()
-        this.sentRequests = res
-      } catch (e) {
+        this.sentRequests = (res as FriendRequestItem[]) || []
+      } catch {
         // 非关键，忽略错误
       }
     },
 
-    // 更新好友在线状态
-    updateFriendStatus(userId, isOnline) {
-      // 使用 loose equality (==) 兼容 string/number 类型的 ID
+    updateFriendStatus(userId: number, isOnline: boolean) {
       const friendIndex = this.friends.findIndex((f) => f.id == userId || f.friendId == userId)
       if (friendIndex !== -1) {
-        // 创建新对象以触发响应式更新
         const friend = this.friends[friendIndex]
-        // 只有当状态真正改变时才更新，避免不必要的响应式触发
         if (friend.online !== isOnline) {
           this.friends[friendIndex] = { ...friend, online: isOnline }
           logger.debug(
@@ -111,7 +158,7 @@ export const useFriendStore = defineStore('friend', {
       }
     },
 
-    async doSearch(keyword) {
+    async doSearch(keyword: string) {
       if (!keyword) {
         this.searchResults = []
         return
@@ -120,33 +167,33 @@ export const useFriendStore = defineStore('friend', {
       try {
         const res = await searchUsers(keyword)
         this.searchResults = Array.isArray(res) ? res : []
-      } catch (e) {
+      } catch {
         ElMessage.error('搜索用户失败')
       } finally {
         this.loading = false
       }
     },
 
-    async applyFriend(toUserId, message = '') {
+    async applyFriend(toUserId: number, message: string = '') {
       try {
-        const res = await sendFriendRequest({ toUserId, message })
+        await sendFriendRequest({ toUserId, message })
         ElMessage.success('好友申请已发送')
-        // await this.fetchOutgoingRequests()
-        return res
-      } catch (e) {
-        ElMessage.error(e.response?.data?.message || '发送好友申请失败')
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } }
+        ElMessage.error(err.response?.data?.message || '发送好友申请失败')
         throw e
       }
     },
 
-    async processRequest(requestId, actionOrStatus) {
+    async processRequest(requestId: number, actionOrStatus: string | number) {
       const status = typeof actionOrStatus === 'string' ? (actionOrStatus === 'accept' ? 1 : 2) : actionOrStatus
       try {
         await handleFriendRequest({ requestId, status })
         ElMessage.success(status === 1 ? '已同意申请' : '已拒绝申请')
         await Promise.all([this.fetchIncomingRequests(), this.fetchFriends()])
-      } catch (e) {
-        ElMessage.error(e.response?.data?.message || '处理好友申请失败')
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } }
+        ElMessage.error(err.response?.data?.message || '处理好友申请失败')
         throw e
       }
     },
@@ -155,42 +202,40 @@ export const useFriendStore = defineStore('friend', {
       try {
         const res = await getFriendGroupList()
         const rawGroups = Array.isArray(res) ? res : []
-        this.groups = rawGroups.map((g) => ({
+        this.groups = (rawGroups as unknown as Record<string, unknown>[]).map((g) => ({
           ...g,
           items: [],
           expanded: false,
           loaded: false
-        }))
-      } catch (e) {
+        })) as FriendGroup[]
+      } catch (e: unknown) {
         logger.error('获取分组列表失败', e)
       }
     },
 
-    async fetchGroupItems(groupName) {
+    async fetchGroupItems(groupName: string) {
       try {
         const res = await getFriendGroupItemList(groupName)
         const items = Array.isArray(res) ? res : []
         const group = this.groups.find((g) => g.groupName === groupName)
         if (group) {
-          group.items = items.map((item) => ({
+          group.items = (items as unknown as Record<string, unknown>[]).map((item) => ({
             ...item,
-            // Mapping from FriendGroupItemVO
             id: item.friendId,
             avatar: item.friendAvatar,
             remark: item.remarkName,
             nickname: item.friendNickname,
             online: item.onlineStatus === true || item.onlineStatus === 1,
-            // No signature in VO, but we can keep nickname as fallback for display if needed
             signature: null
-          }))
+          })) as FriendItem[]
           group.loaded = true
         }
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error(`获取分组 ${groupName} 好友失败`, e)
       }
     },
 
-    async changeFriendGroup(friendId, groupName) {
+    async changeFriendGroup(friendId: number, groupName: string) {
       try {
         await updateFriendGroup({ friendId, groupName })
         ElMessage.success('好友分组修改成功')
@@ -202,50 +247,47 @@ export const useFriendStore = defineStore('friend', {
         }
         await this.fetchFriends()
         await this.fetchFriendGroups()
-      } catch (e) {
-        ElMessage.error(e.response?.data?.message || '修改好友分组失败')
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } }
+        ElMessage.error(err.response?.data?.message || '修改好友分组失败')
         throw e
       }
     },
 
-    async fetchFriendDetail(friendId) {
+    async fetchFriendDetail(friendId: number) {
       try {
         const res = await getFriendDetail(friendId)
-        const data = res
+        const data = res as unknown as Record<string, unknown>
         if (data) {
           this.currentFriendDetail = {
             ...data,
-            // Mapping from FriendDetailVO
-            id: data.friendUserId,
-            avatar: data.friendAvatar,
-            remark: data.remarkName,
-            nickname: data.friendNickname,
-            groupName: data.groupName,
-            gender: data.gender,
-            signature: data.signature,
-            online: false // Detail VO doesn't have online status, defaults to false or need separate check
+            id: data.friendUserId as number,
+            avatar: data.friendAvatar as string,
+            remark: data.remarkName as string,
+            nickname: data.friendNickname as string,
+            groupName: data.groupName as string,
+            gender: data.gender as string,
+            signature: data.signature as string,
+            online: false
           }
-          // Try to find online status from existing list if possible
-          const friendInList = this.friends.find((f) => f.id === data.friendUserId)
+          const friendInList = this.friends.find((f) => f.id === (data.friendUserId as number))
           if (friendInList) {
             this.currentFriendDetail.online = friendInList.online
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('获取好友详情失败', e)
       }
     },
 
-    async updateRemark(friendId, remark) {
+    async updateRemark(friendId: number, remark: string) {
       try {
         await updateFriendRemark({ friendId, remark })
         ElMessage.success('备注已更新')
-        // Update local state directly
         const friend = this.friends.find((f) => f.id === friendId)
         if (friend) {
           friend.remark = remark
         }
-        // Sync with groups
         if (this.groups) {
           this.groups.forEach((group) => {
             if (group.items) {
@@ -256,39 +298,36 @@ export const useFriendStore = defineStore('friend', {
             }
           })
         }
-        // Sync with current detail
         if (
           this.currentFriendDetail &&
           (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)
         ) {
           this.currentFriendDetail.remark = remark
         }
-      } catch (e) {
-        ElMessage.error('更新备注失败')
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } }
+        ElMessage.error(err.response?.data?.message || '更新备注失败')
         throw e
       }
     },
 
-    async deleteFriend(friendId) {
+    async deleteFriend(friendId: number) {
       try {
         await deleteFriend(friendId)
         ElMessage.success('好友删除成功')
-        // Refresh friend list
         await this.fetchFriends()
-        // Clear current friend detail if it was the deleted friend
         if (
           this.currentFriendDetail &&
           (this.currentFriendDetail.id === friendId || this.currentFriendDetail.userId === friendId)
         ) {
           this.currentFriendDetail = null
         }
-        // Refresh groups
         await this.fetchFriendGroups()
-        // Refresh chat sessions
         const chatStore = useChatStore()
         await chatStore.fetchSessions()
-      } catch (e) {
-        ElMessage.error(e.response?.data?.message || '删除好友失败')
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } }
+        ElMessage.error(err.response?.data?.message || '删除好友失败')
         throw e
       }
     }

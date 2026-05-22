@@ -5,12 +5,44 @@ import { useWebSocketStore } from './useWebSocketStore'
 import { useUserStore } from '../user'
 import { recallPrivateMessage, recallGroupMessage } from '../../api/chat'
 import logger from '../../utils/logger'
+import type { UIMessage } from '../../types/message'
+
+interface MessagePayload {
+  error?: boolean
+  errorMessage?: string
+  receiverId?: number
+  tempId?: string
+  senderId?: number
+  content?: string
+  messageId?: number
+  id?: number
+  sendTime?: string
+  messageType?: number
+  fileName?: string
+  fileSize?: number
+  fileUrl?: string
+  groupId?: number
+  senderNickname?: string
+  senderAvatar?: string
+  messageSeq?: number
+  isGroup?: boolean
+  recallUserId?: number
+  chatId?: number
+  [key: string]: unknown
+}
 
 export const useMessageActions = defineStore('msgActions', {
   state: () => ({}),
 
   actions: {
-    sendMessage(toUserId, content, type = 1, fileName = null, fileSize = null, fileUrl = null) {
+    sendMessage(
+      toUserId: number,
+      content: string,
+      type: number = 1,
+      fileName: string | null = null,
+      fileSize: number | null = null,
+      fileUrl: string | null = null
+    ) {
       const chatStore = useChatStore()
       const wsStore = useWebSocketStore()
       const userStore = useUserStore()
@@ -34,34 +66,35 @@ export const useMessageActions = defineStore('msgActions', {
       const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
       const dto = {
-        senderId: senderId,
+        senderId,
         receiverId: toUserId,
         content: content.trim(),
         messageType: type,
         fileName: fileName || undefined,
         fileSize: fileSize || undefined,
         fileUrl: fileUrl || undefined,
-        tempId: tempId
+        tempId
       }
 
       try {
         logger.debug('发送消息:', dto)
 
-        wsStore.stomp.send('/app/chat.private', {}, JSON.stringify(dto))
+        wsStore.stomp!.send('/app/chat.private', {}, JSON.stringify(dto))
 
-        const selfMsg = {
+        const selfMsg: UIMessage = {
           id: tempId,
           fromId: 'self',
           toId: toUserId,
           content: content.trim(),
           timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
+          type: type as 1 | 2 | 3 | 5,
+          fileName: fileName || undefined,
+          fileSize: fileSize || undefined,
+          fileUrl: fileUrl || undefined,
           isSending: true,
+          isReceived: false,
           sendError: false,
-          tempId: tempId
+          tempId
         }
 
         const key = `private_${toUserId}`
@@ -72,25 +105,27 @@ export const useMessageActions = defineStore('msgActions', {
 
         logger.debug('临时消息已添加，等待服务器确认，临时ID:', tempId)
         return Promise.resolve(true)
-      } catch (e) {
+      } catch (e: unknown) {
+        const err = e as Error
         logger.error('发送消息失败:', e)
-        ElMessage.error('发送失败: ' + (e.message || '未知错误'))
+        ElMessage.error('发送失败: ' + (err.message || '未知错误'))
 
         const key = `private_${toUserId}`
         const list = chatStore.messagesByUser[key] || []
-        const failMsg = {
+        const failMsg: UIMessage = {
           id: tempId,
           fromId: 'self',
           toId: toUserId,
           content: content.trim(),
           timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
+          type: type as 1 | 2 | 3 | 5,
+          fileName: fileName || undefined,
+          fileSize: fileSize || undefined,
+          fileUrl: fileUrl || undefined,
           isSending: false,
+          isReceived: false,
           sendError: true,
-          tempId: tempId
+          tempId
         }
         chatStore.messagesByUser[key] = [...list, failMsg]
 
@@ -98,7 +133,14 @@ export const useMessageActions = defineStore('msgActions', {
       }
     },
 
-    sendGroupMessage(groupId, content, type = 1, fileName = null, fileSize = null, fileUrl = null) {
+    sendGroupMessage(
+      groupId: number,
+      content: string,
+      type: number = 1,
+      fileName: string | null = null,
+      fileSize: number | null = null,
+      fileUrl: string | null = null
+    ) {
       const chatStore = useChatStore()
       const wsStore = useWebSocketStore()
       const userStore = useUserStore()
@@ -127,35 +169,36 @@ export const useMessageActions = defineStore('msgActions', {
       const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
       const dto = {
-        senderId: senderId,
-        groupId: groupId,
+        senderId,
+        groupId,
         content: content.trim(),
         messageType: type,
         fileName: fileName || undefined,
         fileSize: fileSize || undefined,
         fileUrl: fileUrl || undefined,
-        tempId: tempId
+        tempId
       }
 
       try {
         logger.debug('发送群聊消息:', dto)
 
-        wsStore.stomp.send('/app/chat.group', {}, JSON.stringify(dto))
+        wsStore.stomp!.send('/app/chat.group', {}, JSON.stringify(dto))
 
-        const selfMsg = {
+        const selfMsg: UIMessage = {
           id: tempId,
           fromId: 'self',
           toId: groupId,
-          groupId: groupId,
+          groupId,
           content: content.trim(),
           timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
+          type: type as 1 | 2 | 3 | 5,
+          fileName: fileName || undefined,
+          fileSize: fileSize || undefined,
+          fileUrl: fileUrl || undefined,
           isSending: true,
+          isReceived: false,
           sendError: false,
-          tempId: tempId
+          tempId
         }
 
         const key = `group_${groupId}`
@@ -166,26 +209,28 @@ export const useMessageActions = defineStore('msgActions', {
 
         logger.debug('群聊临时消息已添加，等待服务器确认，临时ID:', tempId)
         return Promise.resolve(true)
-      } catch (e) {
+      } catch (e: unknown) {
+        const err = e as Error
         logger.error('发送群聊消息失败:', e)
-        ElMessage.error('发送失败: ' + (e.message || '未知错误'))
+        ElMessage.error('发送失败: ' + (err.message || '未知错误'))
 
         const key = `group_${groupId}`
         const list = chatStore.messagesByUser[key] || []
-        const failMsg = {
+        const failMsg: UIMessage = {
           id: tempId,
           fromId: 'self',
           toId: groupId,
-          groupId: groupId,
+          groupId,
           content: content.trim(),
           timestamp: Date.now(),
-          type: type,
-          fileName: fileName || null,
-          fileSize: fileSize || null,
-          fileUrl: fileUrl || null,
+          type: type as 1 | 2 | 3 | 5,
+          fileName: fileName || undefined,
+          fileSize: fileSize || undefined,
+          fileUrl: fileUrl || undefined,
           isSending: false,
+          isReceived: false,
           sendError: true,
-          tempId: tempId
+          tempId
         }
         chatStore.messagesByUser[key] = [...list, failMsg]
 
@@ -193,7 +238,7 @@ export const useMessageActions = defineStore('msgActions', {
       }
     },
 
-    _handleIncoming(payload) {
+    _handleIncoming(payload: MessagePayload) {
       const chatStore = useChatStore()
       try {
         logger.debug('收到WebSocket消息:', payload)
@@ -214,8 +259,7 @@ export const useMessageActions = defineStore('msgActions', {
                 newList[idx] = {
                   ...newList[idx],
                   isSending: false,
-                  sendError: true,
-                  errorMessage: payload.errorMessage || '发送失败'
+                  sendError: true
                 }
                 chatStore.messagesByUser[key] = newList
                 logger.debug('已标记消息为发送失败, tempId:', tempId)
@@ -238,7 +282,7 @@ export const useMessageActions = defineStore('msgActions', {
           return
         }
 
-        let otherId
+        let otherId: number | undefined
         let isIncoming = false
         if (payload.senderId === selfId) {
           otherId = payload.receiverId
@@ -254,7 +298,7 @@ export const useMessageActions = defineStore('msgActions', {
           return
         }
 
-        let ts
+        let ts: number
         if (payload.sendTime) {
           ts = new Date(payload.sendTime).getTime()
           if (isNaN(ts)) {
@@ -266,17 +310,16 @@ export const useMessageActions = defineStore('msgActions', {
           logger.warn('消息缺少 sendTime，使用当前时间')
         }
 
-        const uiMsg = {
+        const uiMsg: UIMessage = {
           id: payload.messageId || payload.id || `temp_${Date.now()}`,
-          fromId: payload.senderId === selfId ? 'self' : payload.senderId,
-          toId: payload.receiverId,
-          content: payload.content,
+          fromId: payload.senderId === selfId ? 'self' : (payload.senderId as number),
+          toId: payload.receiverId as number,
+          content: payload.content as string,
           timestamp: ts,
-          type: payload.messageType || 1,
+          type: (payload.messageType as 1 | 2 | 3 | 5) || 1,
           fileName: payload.fileName,
           fileSize: payload.fileSize,
           fileUrl: payload.fileUrl,
-          originalPayload: payload,
           isSending: false,
           isReceived: true,
           sendError: false
@@ -296,7 +339,9 @@ export const useMessageActions = defineStore('msgActions', {
         const list = chatStore.messagesByUser[key] || []
 
         if (payload.tempId) {
-          const tempIdx = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
+          const tempIdx = list.findIndex(
+            (msg) => msg.tempId === payload.tempId || msg.id === payload.tempId
+          )
           if (tempIdx !== -1) {
             const newList = [...list]
             newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
@@ -318,12 +363,12 @@ export const useMessageActions = defineStore('msgActions', {
         chatStore.messagesByUser[key] = [...list, uiMsg]
         logger.debug('消息已添加到列表，当前消息数:', chatStore.messagesByUser[key].length)
         chatStore._updateSession(otherId, ts, isIncoming, false)
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('处理收到的消息失败:', e, '原始payload:', payload)
       }
     },
 
-    _handleGroupMessage(payload) {
+    _handleGroupMessage(payload: MessagePayload) {
       const chatStore = useChatStore()
       try {
         logger.debug('收到群聊消息:', payload)
@@ -331,26 +376,28 @@ export const useMessageActions = defineStore('msgActions', {
         if (payload.isGroup && payload.recallUserId) {
           const groupId = payload.chatId
           const messageId = payload.messageId
-          const key = `group_${groupId}`
-          const list = chatStore.messagesByUser[key] || []
+          if (groupId && messageId) {
+            const key = `group_${groupId}`
+            const list = chatStore.messagesByUser[key] || []
 
-          const idx = list.findIndex((m) => m.id === messageId)
-          if (idx !== -1) {
-            const newList = [...list]
-            const oldMsg = newList[idx]
-            const senderNickname = oldMsg.senderNickname || '成员'
-            const isSelf = oldMsg.fromId === 'self'
+            const idx = list.findIndex((m) => m.id === messageId)
+            if (idx !== -1) {
+              const newList = [...list]
+              const oldMsg = newList[idx]
+              const senderNickname = oldMsg.senderNickname || '成员'
+              const isSelf = oldMsg.fromId === 'self'
 
-            newList[idx] = {
-              ...oldMsg,
-              content: isSelf ? '你撤回了一条消息' : `"${senderNickname}" 撤回了一条消息`,
-              type: 5,
-              recall: true
+              newList[idx] = {
+                ...oldMsg,
+                content: isSelf ? '你撤回了一条消息' : `"${senderNickname}" 撤回了一条消息`,
+                type: 5,
+                recall: true
+              }
+              chatStore.messagesByUser[key] = newList
+              logger.debug('群聊消息已更新为撤回状态:', messageId)
+            } else {
+              logger.warn('收到群聊撤回通知，但本地未找到对应消息:', messageId)
             }
-            chatStore.messagesByUser[key] = newList
-            logger.debug('群聊消息已更新为撤回状态:', messageId)
-          } else {
-            logger.warn('收到群聊撤回通知，但本地未找到对应消息:', messageId)
           }
           return
         }
@@ -369,7 +416,7 @@ export const useMessageActions = defineStore('msgActions', {
           return
         }
 
-        let ts
+        let ts: number
         if (payload.sendTime) {
           ts = new Date(payload.sendTime).getTime()
           if (isNaN(ts)) {
@@ -381,14 +428,14 @@ export const useMessageActions = defineStore('msgActions', {
           logger.warn('群聊消息缺少 sendTime，使用当前时间')
         }
 
-        const uiMsg = {
+        const uiMsg: UIMessage = {
           id: payload.messageId || payload.id || `group_${Date.now()}`,
-          fromId: payload.senderId === selfId ? 'self' : payload.senderId,
+          fromId: payload.senderId === selfId ? 'self' : (payload.senderId as number),
           toId: groupId,
-          groupId: groupId,
-          content: payload.content,
+          groupId,
+          content: payload.content as string,
           timestamp: ts,
-          type: payload.messageType || 1,
+          type: (payload.messageType as 1 | 2 | 3 | 5) || 1,
           fileName: payload.fileName,
           fileSize: payload.fileSize,
           fileUrl: payload.fileUrl,
@@ -403,7 +450,9 @@ export const useMessageActions = defineStore('msgActions', {
 
         if (uiMsg.type === 5) {
           uiMsg.content =
-            uiMsg.fromId === 'self' ? '你撤回了一条消息' : `"${uiMsg.senderNickname || '成员'}" 撤回了一条消息`
+            uiMsg.fromId === 'self'
+              ? '你撤回了一条消息'
+              : `"${uiMsg.senderNickname || '成员'}" 撤回了一条消息`
         }
 
         logger.debug('构建的群聊UI消息:', uiMsg)
@@ -412,10 +461,18 @@ export const useMessageActions = defineStore('msgActions', {
         const list = chatStore.messagesByUser[key] || []
 
         if (payload.tempId) {
-          const tempIdx = list.findIndex((msg) => msg.tempId === payload.tempId || msg.id === payload.tempId)
+          const tempIdx = list.findIndex(
+            (msg) => msg.tempId === payload.tempId || msg.id === payload.tempId
+          )
           if (tempIdx !== -1) {
             const newList = [...list]
-            newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
+            newList[tempIdx] = {
+              ...newList[tempIdx],
+              ...uiMsg,
+              id: uiMsg.id,
+              isSending: false,
+              sendError: false
+            }
             chatStore.messagesByUser[key] = newList
             logger.debug('群聊临时消息已确认为真实消息:', uiMsg.id)
             return
@@ -453,13 +510,13 @@ export const useMessageActions = defineStore('msgActions', {
         chatStore.messagesByUser[key] = [...list, uiMsg]
         logger.debug('群聊消息已添加到列表，当前消息数:', chatStore.messagesByUser[key].length)
         const isIncoming = payload.senderId !== selfId
-        chatStore._updateSession(groupId, ts, isIncoming, true, uiMsg.messageSeq)
-      } catch (e) {
+        chatStore._updateSession(groupId, ts, isIncoming, true, uiMsg.messageSeq || null)
+      } catch (e: unknown) {
         logger.error('处理群聊消息失败:', e, '原始payload:', payload)
       }
     },
 
-    _handleRecallNotification(payload) {
+    _handleRecallNotification(payload: MessagePayload) {
       const chatStore = useChatStore()
       logger.debug('收到撤回通知:', payload)
       const messageId = payload.messageId
@@ -468,12 +525,14 @@ export const useMessageActions = defineStore('msgActions', {
       const userStore = useUserStore()
       const selfId = userStore.userInfo?.id
 
-      let targetUserId
+      let targetUserId: number | undefined
       if (payload.recallUserId === selfId) {
         targetUserId = payload.chatId
       } else {
         targetUserId = payload.recallUserId
       }
+
+      if (!targetUserId) return
 
       const key = `private_${targetUserId}`
       const list = chatStore.messagesByUser[key] || []
@@ -494,11 +553,11 @@ export const useMessageActions = defineStore('msgActions', {
       }
     },
 
-    async recallMessage(messageId) {
+    async recallMessage(messageId: number) {
       const chatStore = useChatStore()
-      if (!messageId) return false
+      if (!messageId || !chatStore.activeUser) return false
 
-      const isGroup = chatStore.activeUser && chatStore.activeUser.type === 1
+      const isGroup = chatStore.activeUser.type === 1
 
       try {
         if (isGroup) {
@@ -507,7 +566,6 @@ export const useMessageActions = defineStore('msgActions', {
           await recallPrivateMessage(messageId)
         }
 
-        if (!chatStore.activeUser) return true
         const key = `${isGroup ? 'group' : 'private'}_${chatStore.activeUser.id}`
         const list = chatStore.messagesByUser[key] || []
         const idx = list.findIndex((m) => m.id === messageId)
@@ -522,7 +580,7 @@ export const useMessageActions = defineStore('msgActions', {
           chatStore.messagesByUser[key] = newList
         }
         return true
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('撤回消息失败:', e)
         ElMessage.error('撤回失败')
         return false

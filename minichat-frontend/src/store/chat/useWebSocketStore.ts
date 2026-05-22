@@ -10,31 +10,38 @@ import logger from '../../utils/logger'
 
 const sockPath = '/api/minichat-websocket'
 
-const getWebSocketUrl = (token) => {
+function getWebSocketUrl(token: string): string {
   const wsBase = import.meta.env.VITE_WS_BASE
   if (wsBase) {
-    const url = wsBase
-    return token ? `${url}?token=${encodeURIComponent(token)}` : url
+    return token ? `${wsBase}?token=${encodeURIComponent(token)}` : wsBase
   }
-  const path = sockPath
-  return token ? `${path}?token=${encodeURIComponent(token)}` : path
+  return token ? `${sockPath}?token=${encodeURIComponent(token)}` : sockPath
+}
+
+interface ConnectionStatus {
+  stomp: Stomp.Client | null
+  connecting: boolean
+  connected: boolean
+  stompConnected: boolean | undefined
+  error: string | null
+  subscriptions: number
 }
 
 export const useWebSocketStore = defineStore('ws', {
   state: () => ({
-    stomp: null,
+    stomp: null as Stomp.Client | null,
     connecting: false,
     connected: false,
-    connectionError: null,
-    subscriptions: new Map(),
-    groupSubscriptions: new Map(),
-    heartbeatTimer: null,
+    connectionError: null as string | null,
+    subscriptions: new Map<string, Stomp.Subscription>(),
+    groupSubscriptions: new Map<number, Stomp.Subscription>(),
+    heartbeatTimer: null as ReturnType<typeof setInterval> | null,
     heartbeatCount: 0
   }),
 
   getters: {
-    isConnected(state) {
-      return state.connected && state.stomp && state.stomp.connected
+    isConnected(state): boolean {
+      return state.connected && !!state.stomp && !!state.stomp.connected
     }
   },
 
@@ -63,7 +70,7 @@ export const useWebSocketStore = defineStore('ws', {
         const ws = new SockJS(url)
         const client = Stomp.over(ws)
 
-        client.debug = (msg) => {
+        client.debug = (msg: string) => {
           if (
             msg.startsWith('>>> CONNECT') ||
             msg.startsWith('<<< CONNECTED') ||
@@ -76,7 +83,7 @@ export const useWebSocketStore = defineStore('ws', {
           }
         }
 
-        const headers = {}
+        const headers: Record<string, string> = {}
         if (token) {
           headers.Authorization = token.trim()
           logger.debug('设置 Authorization 头:', headers.Authorization)
@@ -84,8 +91,8 @@ export const useWebSocketStore = defineStore('ws', {
 
         client.connect(
           headers,
-          (frame) => {
-            logger.debug('WebSocket 连接成功! Frame:', frame)
+          () => {
+            logger.debug('WebSocket 连接成功!')
             this.stomp = client
             this.connecting = false
             this.connected = true
@@ -109,7 +116,7 @@ export const useWebSocketStore = defineStore('ws', {
                 } else {
                   logger.warn('收到未知格式响应:', result)
                 }
-              } catch (e) {
+              } catch (e: unknown) {
                 logger.error('解析消息失败:', e, '原始消息:', message.body)
                 ElMessage.error('消息解析失败')
               }
@@ -122,9 +129,11 @@ export const useWebSocketStore = defineStore('ws', {
                 if (statusDto && statusDto.userId) {
                   const friendStore = useFriendStore()
                   friendStore.updateFriendStatus(statusDto.userId, statusDto.isOnline)
-                  logger.debug(`用户 ${statusDto.userId} 状态已更新为: ${statusDto.isOnline ? '在线' : '离线'}`)
+                  logger.debug(
+                    `用户 ${statusDto.userId} 状态已更新为: ${statusDto.isOnline ? '在线' : '离线'}`
+                  )
                 }
-              } catch (e) {
+              } catch (e: unknown) {
                 logger.error('解析用户状态消息失败:', e)
               }
             })
@@ -133,7 +142,7 @@ export const useWebSocketStore = defineStore('ws', {
               try {
                 const recallDto = JSON.parse(message.body)
                 msgActions._handleRecallNotification(recallDto)
-              } catch (e) {
+              } catch (e: unknown) {
                 logger.error('解析撤回消息失败:', e)
               }
             })
@@ -144,14 +153,11 @@ export const useWebSocketStore = defineStore('ws', {
             logger.debug('已订阅 /user/queue/private, /topic/user-status, /user/queue/private_recall')
 
             this._subscribeAllGroups()
-
             this._refreshFriendStatus()
-
             this._sendConnectionTest()
-
             this.startHeartbeat()
           },
-          (error) => {
+          (error: Stomp.Frame) => {
             logger.error('WebSocket 连接失败:', error)
 
             if (error.headers) {
@@ -189,11 +195,12 @@ export const useWebSocketStore = defineStore('ws', {
             }
           }
         }, 15000)
-      } catch (e) {
+      } catch (e: unknown) {
+        const err = e as Error
         logger.error('WebSocket 初始化异常:', e)
         this.connecting = false
-        this.connectionError = e.message
-        ElMessage.error('初始化失败: ' + e.message)
+        this.connectionError = err.message
+        ElMessage.error('初始化失败: ' + err.message)
       }
     },
 
@@ -202,7 +209,7 @@ export const useWebSocketStore = defineStore('ws', {
         try {
           subscription.unsubscribe()
           logger.debug('取消订阅:', key)
-        } catch (e) {
+        } catch (e: unknown) {
           logger.error('取消订阅失败:', key, e)
         }
       })
@@ -212,7 +219,7 @@ export const useWebSocketStore = defineStore('ws', {
         try {
           subscription.unsubscribe()
           logger.debug('取消群聊订阅:', groupId)
-        } catch (e) {
+        } catch (e: unknown) {
           logger.error('取消群聊订阅失败:', groupId, e)
         }
       })
@@ -226,7 +233,7 @@ export const useWebSocketStore = defineStore('ws', {
           this.stomp.disconnect(() => {
             logger.debug('WebSocket 已断开')
           })
-        } catch (e) {
+        } catch (e: unknown) {
           logger.error('断开连接时出错:', e)
         }
         this.stomp = null
@@ -250,7 +257,7 @@ export const useWebSocketStore = defineStore('ws', {
       }, 1000)
     },
 
-    checkConnectionStatus() {
+    checkConnectionStatus(): ConnectionStatus {
       logger.debug('=== WebSocket 连接状态 ===')
       logger.debug('STOMP 实例:', this.stomp)
       logger.debug('连接中:', this.connecting)
@@ -269,7 +276,7 @@ export const useWebSocketStore = defineStore('ws', {
       }
     },
 
-    testSendMessage(toUserId = 4) {
+    testSendMessage(toUserId: number = 4) {
       const testContent = `测试消息 ${new Date().toLocaleTimeString()}`
       logger.debug('发送测试消息给用户:', toUserId, '内容:', testContent)
       return useMessageActions().sendMessage(toUserId, testContent)
@@ -279,7 +286,7 @@ export const useWebSocketStore = defineStore('ws', {
       this.stopHeartbeat()
       logger.debug('启动应用层心跳，每30秒发送一次')
       this.heartbeatTimer = setInterval(() => {
-        if (this.isConnected) {
+        if (this.isConnected && this.stomp) {
           try {
             this.stomp.send('/app/heartbeat', {}, JSON.stringify({}))
             logger.debug('已发送心跳包')
@@ -290,7 +297,7 @@ export const useWebSocketStore = defineStore('ws', {
               this.heartbeatCount = 0
               this._refreshFriendStatus()
             }
-          } catch (e) {
+          } catch (e: unknown) {
             logger.error('发送心跳失败:', e)
           }
         }
@@ -323,8 +330,8 @@ export const useWebSocketStore = defineStore('ws', {
       logger.debug(`已订阅 ${this.groupSubscriptions.size} 个群聊`)
     },
 
-    _subscribeGroup(groupId) {
-      if (!this.isConnected || !groupId) {
+    _subscribeGroup(groupId: number) {
+      if (!this.isConnected || !groupId || !this.stomp) {
         return
       }
 
@@ -342,7 +349,7 @@ export const useWebSocketStore = defineStore('ws', {
             logger.debug('解析后的群聊消息:', result)
 
             useMessageActions()._handleGroupMessage(result)
-          } catch (e) {
+          } catch (e: unknown) {
             logger.error('解析群聊消息失败:', e, '原始消息:', message.body)
             ElMessage.error('群聊消息解析失败')
           }
@@ -350,12 +357,12 @@ export const useWebSocketStore = defineStore('ws', {
 
         this.groupSubscriptions.set(groupId, subscription)
         logger.debug(`已订阅群聊: ${groupId}, topic: ${topic}`)
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error(`订阅群聊 ${groupId} 失败:`, e)
       }
     },
 
-    _unsubscribeGroup(groupId) {
+    _unsubscribeGroup(groupId: number) {
       if (!groupId) return
 
       const subscription = this.groupSubscriptions.get(groupId)
@@ -364,7 +371,7 @@ export const useWebSocketStore = defineStore('ws', {
           subscription.unsubscribe()
           this.groupSubscriptions.delete(groupId)
           logger.debug(`已取消订阅群聊: ${groupId}`)
-        } catch (e) {
+        } catch (e: unknown) {
           logger.error(`取消订阅群聊 ${groupId} 失败:`, e)
         }
       }
@@ -385,11 +392,10 @@ export const useWebSocketStore = defineStore('ws', {
         if (friendStore.friends && friendStore.friends.length > 0) {
           const ids = friendStore.friends.map((f) => f.id)
           const { batchCheckUserOnlineStatus } = await import('../../api/userStatus')
-          const statusRes = await batchCheckUserOnlineStatus(ids)
+          const statusRes: Record<number, boolean> = await batchCheckUserOnlineStatus(ids)
           if (statusRes) {
-            const statusMap = statusRes
             friendStore.friends.forEach((friend) => {
-              const isOnline = !!statusMap[friend.id]
+              const isOnline = !!statusRes[friend.id]
               if (friend.online !== isOnline) {
                 friendStore.updateFriendStatus(friend.id, isOnline)
               }
@@ -397,7 +403,7 @@ export const useWebSocketStore = defineStore('ws', {
             logger.debug('好友在线状态已刷新')
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         logger.error('刷新好友在线状态失败:', e)
       }
     }
