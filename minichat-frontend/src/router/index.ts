@@ -1,39 +1,33 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
-import Login from '../views/Login.vue'
-import Register from '../views/Register.vue'
-import Main from '../views/Main.vue'
-import Friend from '../views/Friend.vue'
-import GroupApply from '../views/GroupApply.vue'
-
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Main',
-    component: Main,
+    component: () => import('../views/Main.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/group-apply',
     name: 'GroupApply',
-    component: GroupApply,
+    component: () => import('../views/GroupApply.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/friend',
     name: 'Friend',
-    component: Friend,
+    component: () => import('../views/Friend.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/login',
     name: 'Login',
-    component: Login
+    component: () => import('../views/Login.vue')
   },
   {
     path: '/register',
     name: 'Register',
-    component: Register
+    component: () => import('../views/Register.vue')
   }
 ]
 
