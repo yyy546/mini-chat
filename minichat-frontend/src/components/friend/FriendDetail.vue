@@ -249,11 +249,8 @@ const handleToggleLike = async (post) => {
   likeLoadingPostId.value = postId
 
   try {
-    const res = await changeLikeStatus(postId)
-    if (res.code !== 1) {
-      throw new Error(res.msg || '操作失败')
-    }
-    // Success, keep optimistic state
+    await changeLikeStatus(postId)
+    // 拦截器已解包，成功返回即操作成功，失败由拦截器抛出 BusinessError
   } catch (e) {
     logger.error(e)
     ElMessage.error(e.message || '点赞出错')
