@@ -12,6 +12,7 @@
       <div
         v-for="item in filtered"
         :key="item.id"
+        v-memo="[item.id, item.name, item.unreadCount, item.online, item.lastMessageTime, activeId, activeType]"
         :class="['list-item', { active: activeId == item.id && (item.type || 0) === (activeType || 0) }]"
         @click="emit('select', item)"
       >
