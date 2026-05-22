@@ -84,8 +84,8 @@
           <template v-if="activeTab === 'message'">
             <FriendList
               :friends="filteredList"
-              :active-id="active?.id"
-              :active-type="active?.type"
+              :active-id="(active as any)?.id"
+              :active-type="(active as any)?.type"
               @select="onSelect"
             />
           </template>
@@ -128,8 +128,8 @@
   </el-container>
 </template>
 
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import FriendList from '../components/friend/FriendList.vue'
 import FriendGroupList from '../components/friend/FriendGroupList.vue'
@@ -140,6 +140,9 @@ import CreateGroupDialog from '../components/group/CreateGroupDialog.vue'
 import ChatWindow from '../components/chat/ChatWindow.vue'
 import UserProfile from '../components/user/UserProfile.vue'
 import Space from './Space.vue'
+import { useTheme } from '../composables/useTheme'
+import { useNavigation } from '../composables/useNavigation'
+import { useSessionFilter } from '../composables/useSessionFilter'
 import { useFriendStore } from '../store/friend'
 import { useChatStore } from '../store/chat'
 import { useUserStore } from '../store/user'
@@ -148,228 +151,62 @@ const friendStore = useFriendStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const router = useRouter()
-const filter = ref('')
-const activeTab = ref('message')
+const { isDark, applyTheme, resolveInitial, toggle: toggleTheme } = useTheme()
+const { activeTab, contactTab, switchToMessage, switchToContact } = useNavigation()
+const { filter, filteredList, buildChatUser } = useSessionFilter()
 const showProfile = ref(false)
 const showCreateGroup = ref(false)
-const selectedContactId = ref(null)
-const selectedGroupId = ref(null)
-const contactTab = ref('friend') // 'friend' | 'group'
-const isDark = ref(false)
-
-const getThemeStorageKey = (userId) => `theme:${String(userId)}`
-
-const applyTheme = (dark) => {
-  isDark.value = !!dark
-  const html = document.documentElement
-  if (isDark.value) {
-    html.classList.add('dark')
-  } else {
-    html.classList.remove('dark')
-  }
-}
-
-const resolveInitialTheme = (userId) => {
-  if (userId) {
-    const saved = localStorage.getItem(getThemeStorageKey(userId))
-    if (saved === 'dark') return true
-    if (saved === 'light') return false
-  }
-  return false
-}
-
-const toggleTheme = () => {
-  const userId = userStore.userId
-  const next = !isDark.value
-  applyTheme(next)
-  if (userId) {
-    localStorage.setItem(getThemeStorageKey(userId), next ? 'dark' : 'light')
-  }
-}
-
-const findFriendById = (id) => {
-  if (!id) return null
-  const list = friendStore.friends || []
-  const target = list.find((f) => f.id == id || f.friendId == id || f.userId == id)
-  return target || null
-}
-
-const buildChatUser = (source) => {
-  if (!source) return null
-  const base = { ...source }
-  const type = base.type ?? 0
-  if (type !== 0) return base
-  const friend = findFriendById(base.id)
-  if (!friend) return base
-  return {
-    ...base,
-    name: base.name || friend.remark || friend.nickname || friend.username,
-    nickname: base.nickname || friend.nickname || friend.username,
-    username: base.username || friend.username,
-    remark: base.remark ?? friend.remark,
-    avatar: base.avatar || friend.avatar,
-    online: friend.online
-  }
-}
-
-onMounted(async () => {
-  applyTheme(resolveInitialTheme(userStore.userId))
-
-  try {
-    await Promise.all([friendStore.fetchFriends(), chatStore.fetchSessions()])
-  } catch (e) {
-    await chatStore.fetchSessions()
-  }
-  if (chatStore.sessions.length) {
-    const firstSession = chatStore.sessions[0]
-    const user = buildChatUser({
-      id: firstSession.id,
-      name: firstSession.name,
-      nickname: firstSession.name,
-      username: firstSession.name,
-      avatar: firstSession.avatar,
-      type: firstSession.type
-    })
-    chatStore.setActiveUser(user)
-  }
-})
-
-watch(
-  () => userStore.userId,
-  (newUserId, oldUserId) => {
-    if (newUserId === oldUserId) return
-    if (!newUserId) {
-      applyTheme(false)
-      return
-    }
-    applyTheme(resolveInitialTheme(newUserId))
-  }
-)
-
-const onContactSelect = (item) => {
-  selectedContactId.value = item.id
-}
-
-const onGroupSelect = (item) => {
-  selectedGroupId.value = item.id
-}
-
-const onSendMessage = (user) => {
-  activeTab.value = 'message'
-  const chatUser = buildChatUser(user)
-  chatStore.setActiveUser(chatUser)
-}
-
-const listByTab = computed(() => {
-  if (activeTab.value === 'contacts') return [] // Managed by FriendGroupList
-  if (activeTab.value === 'message') {
-    // 使用会话列表，并根据最后消息时间排序
-    return chatStore.sessions.map((session) => {
-      // 方案C：如果最新一条消息的Seq <= 用户已读Seq，说明最新显示的消息已读，手动隐藏红点
-      // 解决“幽灵未读数”问题（即后面有已撤回的消息导致 unreadCount > 0，但显示的是旧消息）
-      let displayUnread = session.unreadCount || 0
-      if (session.type === 1 && session.lastMessageSeq && session.lastReadSeq) {
-        if (session.lastMessageSeq <= session.lastReadSeq) {
-          displayUnread = 0
-        }
-      }
-
-      const base = {
-        id: session.id,
-        name: session.name,
-        nickname: session.name,
-        username: session.name,
-        avatar: session.avatar,
-        type: session.type, // 0:私聊, 1:群聊
-        lastMessageTime: session.lastMessageTime || 0,
-        unreadCount: displayUnread,
-        _last: session.lastMessageTime || 0
-      }
-      const withStatus = buildChatUser(base)
-      return {
-        ...withStatus,
-        lastMessageTime: session.lastMessageTime || 0,
-        unreadCount: displayUnread,
-        _last: session.lastMessageTime || 0
-      }
-    })
-  }
-  return []
-})
-
-const filteredList = computed(() => {
-  if (!filter.value) return listByTab.value
-  const k = filter.value.toLowerCase()
-  return listByTab.value.filter(
-    (f) =>
-      (f.name || '').toLowerCase().includes(k) ||
-      (f.nickname || '').toLowerCase().includes(k) ||
-      (f.username || '').toLowerCase().includes(k) ||
-      (f.remark || '').toLowerCase().includes(k)
-  )
-})
+const selectedContactId = ref<number | null>(null)
+const selectedGroupId = ref<number | null>(null)
 
 const placeholderByTab = computed(() => {
   if (activeTab.value === 'message') return '搜索会话'
   if (activeTab.value === 'contacts') return contactTab.value === 'friend' ? '搜索好友' : '搜索群聊'
   return '空间'
 })
+const active = computed(() => buildChatUser(chatStore.activeUser as Record<string, unknown> | null))
 
-const active = computed(() => buildChatUser(chatStore.activeUser))
-const onSelect = (f) => {
-  const user = buildChatUser(f)
-  chatStore.setActiveUser(user)
+onMounted(async () => {
+  applyTheme(resolveInitial(userStore.userId))
+  try {
+    await Promise.all([friendStore.fetchFriends(), chatStore.fetchSessions()])
+  } catch { await chatStore.fetchSessions() }
+  if (chatStore.sessions.length) {
+    const s = chatStore.sessions[0]
+    const u = buildChatUser({ id: s.id, name: s.name, nickname: s.name, username: s.name, avatar: s.avatar, type: s.type })
+    if (u) chatStore.setActiveUser(u as unknown as { id: number; type: number })
+  }
+})
+
+const onSelect = (f: Record<string, unknown>) => {
+  const u = buildChatUser(f)
+  if (u) chatStore.setActiveUser(u as unknown as { id: number; type: number })
 }
-
-const onMoreCommand = (cmd) => {
+const onContactSelect = (item: { id: number }) => { selectedContactId.value = item.id }
+const onGroupSelect = (item: { id: number }) => { selectedGroupId.value = item.id }
+const onSendMessage = (user: Record<string, unknown>) => {
+  const u = buildChatUser(user)
+  if (u) switchToMessage(u)
+}
+const onMoreCommand = (cmd: string) => {
   if (cmd === 'logout') userStore.logout()
   if (cmd === 'profile') showProfile.value = true
 }
-
-const onQuickCommand = (cmd) => {
+const onQuickCommand = (cmd: string) => {
   if (cmd === 'addFriend') router.push('/friend')
   if (cmd === 'joinGroup') router.push('/group-apply')
   if (cmd === 'createGroup') showCreateGroup.value = true
 }
-
-const onGroupCreated = async (newGroup) => {
+const onGroupCreated = async (g: { id: number; groupName: string; avatar: string }) => {
   await chatStore.fetchSessions()
   activeTab.value = 'message'
-  if (newGroup) {
-    const user = {
-      id: newGroup.id,
-      name: newGroup.groupName,
-      nickname: newGroup.groupName,
-      avatar: newGroup.avatar,
-      type: 1 // Group
-    }
-    chatStore.setActiveUser(user)
-  }
+  if (g) chatStore.setActiveUser({ id: g.id, name: g.groupName, avatar: g.avatar, type: 1 })
 }
-
-const onOpenProfile = (info) => {
-  // 1. 切换到联系人 Tab
-  activeTab.value = 'contacts'
-
-  // 2. 切换到对应的子 Tab (friend/group)
-  contactTab.value = info.type
-
-  // 3. 选中对应的联系人或群组
-  if (info.type === 'friend') {
-    selectedContactId.value = info.id
-  } else {
-    selectedGroupId.value = info.id
-  }
+const onOpenProfile = (info: { type: 'friend' | 'group'; id: number }) => {
+  switchToContact(info.type, info.id)
+  if (info.type === 'friend') selectedContactId.value = info.id
+  else selectedGroupId.value = info.id
 }
-
-watch(active, () => {}, { immediate: true })
-
-// 当切换到消息标签页时，刷新会话列表
-watch(activeTab, async (newTab) => {
-  if (newTab === 'message') {
-    await chatStore.fetchSessions()
-  }
-})
 </script>
 
 <style scoped>
