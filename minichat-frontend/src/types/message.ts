@@ -1,5 +1,5 @@
-/** 消息类型: 1=文本, 2=图片, 3=文件, 5=撤回 */
-export type MessageType = 1 | 2 | 3 | 5
+/** 消息类型: 1=文本, 2=图片, 3=文件, 4=系统, 5=撤回 */
+export type MessageType = 1 | 2 | 3 | 4 | 5
 
 export interface PrivateMessageDTO {
   senderId: number
@@ -42,6 +42,7 @@ export interface UIMessage {
   sendError: boolean
   tempId?: string
   recall?: boolean
+  errorMessage?: string
 }
 
 export interface RecallMessageDTO {
