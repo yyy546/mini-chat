@@ -1,39 +1,55 @@
 <template>
   <el-main class="chat-body">
-    <div class="messages" ref="listRef" @scroll="onScroll">
-      <div v-if="loadingMore" class="loading-more">
-        <el-icon class="is-loading"><RefreshLeft /></el-icon> 加载中...
-      </div>
-      <div
-        v-for="m in messages"
-        :key="m.timestamp + '_' + (m.id || '')"
-        :id="'msg-' + m.id"
-        :class="['msg', m.type === 4 || m.type === 5 ? 'system-row' : m.fromId === 'self' ? 'self' : 'other']"
-      >
-        <MessageBubble
-          :message="m"
-          :is-self="m.fromId === 'self'"
-          :is-group="friendType === 1"
-          :friend-avatar="friendAvatar"
-          :friend-name="friendName"
-          :self-avatar="selfAvatar"
-          :self-initial="selfInitial"
-          :member-role-map="memberRoleMap"
-          @contextmenu="(e, msg) => $emit('contextmenu', e, msg)"
-          @readd-friend="$emit('readd-friend')"
-        />
-      </div>
-      <el-empty v-if="!messages.length" description="暂无消息" />
+    <DynamicScroller
+      ref="scrollerRef"
+      :items="scrollerItems"
+      :min-item-size="42"
+      key-field="_key"
+      class="messages"
+      @scroll="onScrollerScroll"
+    >
+      <template #default="{ item, active, index }">
+        <DynamicScrollerItem
+          :item="item"
+          :active="active"
+          :data-index="index"
+          :size-dependencies="[item.content?.length, item.type, item.fileName]"
+        >
+          <div
+            :id="'msg-' + item.id"
+            :class="['msg', item.type === 4 || item.type === 5 ? 'system-row' : item.fromId === 'self' ? 'self' : 'other']"
+          >
+            <MessageBubble
+              :message="item"
+              :is-self="item.fromId === 'self'"
+              :is-group="friendType === 1"
+              :friend-avatar="friendAvatar"
+              :friend-name="friendName"
+              :self-avatar="selfAvatar"
+              :self-initial="selfInitial"
+              :member-role-map="memberRoleMap"
+              @contextmenu="(e, msg) => $emit('contextmenu', e, msg)"
+              @readd-friend="$emit('readd-friend')"
+            />
+          </div>
+        </DynamicScrollerItem>
+      </template>
+    </DynamicScroller>
+    <div v-if="loadingMore" class="loading-more">
+      <el-icon class="is-loading"><RefreshLeft /></el-icon> 加载中...
     </div>
+    <el-empty v-if="!messages.length" description="暂无消息" />
   </el-main>
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { RefreshLeft } from '@element-plus/icons-vue'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import { useChatStore } from '@/store/chat'
 import MessageBubble from './MessageBubble.vue'
 import type { UIMessage } from '@/types/message'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 const props = defineProps<{
   messages: UIMessage[]
@@ -52,37 +68,47 @@ defineEmits<{
 }>()
 
 const store = useChatStore()
-const listRef = ref<HTMLElement | null>(null)
+const scrollerRef = ref<any>(null)
 const loadingMore = ref(false)
 const isFirstLoad = ref(true)
 
-async function onScroll(e: Event) {
-  if (isFirstLoad.value) return
-  const target = e.target as HTMLElement
-  if (target.scrollTop < 20 && !loadingMore.value) {
-    const key = `${props.friendType === 1 ? 'group' : 'private'}_${props.friendId}`
-    const pagination = store.chatPagination[key]
-    if (pagination && pagination.hasMore && !pagination.loading) {
-      loadingMore.value = true
-      const oldScrollHeight = target.scrollHeight
-      await store.loadHistory(props.friendId, props.friendType, true)
-      nextTick(() => {
-        const newScrollHeight = target.scrollHeight
-        target.scrollTop = newScrollHeight - oldScrollHeight
-        loadingMore.value = false
-      })
-    }
+const scrollerItems = computed(() =>
+  props.messages.map((m) => ({ ...m, _key: `${m.timestamp}_${m.id || ''}` }))
+)
+
+let scrollEndTimer: ReturnType<typeof setTimeout> | null = null
+
+function onScrollerScroll() {
+  if (!scrollerRef.value || isFirstLoad.value || loadingMore.value) return
+  const el = scrollerRef.value.$el as HTMLElement
+  if (!el) return
+  if (el.scrollTop < 30) {
+    if (scrollEndTimer) clearTimeout(scrollEndTimer)
+    scrollEndTimer = setTimeout(() => {
+      if (el.scrollTop < 30) triggerLoadMore(el)
+    }, 150)
   }
+}
+
+async function triggerLoadMore(el: HTMLElement) {
+  const key = `${props.friendType === 1 ? 'group' : 'private'}_${props.friendId}`
+  const pagination = store.chatPagination[key]
+  if (!pagination || !pagination.hasMore || pagination.loading) return
+  loadingMore.value = true
+  const oldScrollHeight = el.scrollHeight
+  await store.loadHistory(props.friendId, props.friendType, true)
+  nextTick(() => {
+    if (scrollerRef.value) {
+      const newEl = scrollerRef.value.$el as HTMLElement
+      newEl.scrollTop = newEl.scrollHeight - oldScrollHeight
+    }
+    loadingMore.value = false
+  })
 }
 
 function scrollToBottom(smooth = true) {
   nextTick(() => {
-    if (listRef.value) {
-      listRef.value.scrollTo({
-        top: listRef.value.scrollHeight,
-        behavior: smooth ? 'smooth' : 'auto'
-      })
-    }
+    scrollerRef.value?.scrollToBottom()
   })
 }
 
@@ -90,28 +116,27 @@ watch(() => props.messages, async (newVal, oldVal) => {
   if (!newVal || !newVal.length) return
   const newLast = newVal[newVal.length - 1]
   const oldLast = oldVal && oldVal.length ? oldVal[oldVal.length - 1] : null
-
   if (isFirstLoad.value || !oldLast || newLast.id !== oldLast.id) {
-    const smooth = !isFirstLoad.value
     await nextTick()
-    scrollToBottom(smooth)
     if (isFirstLoad.value) {
-      setTimeout(() => {
-        isFirstLoad.value = false
-        scrollToBottom(false)
-      }, 500)
+      scrollToBottom(false)
+      setTimeout(() => { isFirstLoad.value = false; scrollToBottom(false) }, 500)
+    } else {
+      scrollToBottom(true)
     }
   }
 })
 
 watch(() => props.friendId, () => { isFirstLoad.value = true })
 
-defineExpose({ scrollToBottom, listRef, isFirstLoad, loadingMore })
+defineExpose({ scrollToBottom, scrollerRef })
 </script>
 
 <style scoped>
-.chat-body { background: var(--el-bg-color-page); flex: 1; overflow: hidden; }
-.messages { height: 100%; overflow-y: auto; padding: 16px; }
+.chat-body { background: var(--el-bg-color-page); flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.messages { flex: 1; }
+.messages :deep(.vue-recycle-scroller) { padding: 16px; }
+.messages :deep(.vue-recycle-scroller__item-wrapper) { /* container */ }
 .msg { max-width: 70%; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; width: fit-content; }
 .msg.self { margin-left: auto; }
 .msg.other { margin-right: auto; }

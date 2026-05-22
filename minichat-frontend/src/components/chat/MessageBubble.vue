@@ -27,6 +27,7 @@
             :preview-src-list="[message.fileUrl]"
             :preview-teleported="true"
             hide-on-click-modal
+            loading="lazy"
           >
             <template #error>
               <div class="image-placeholder">图片加载失败</div>
@@ -65,6 +66,7 @@
               :preview-src-list="[message.fileUrl]"
               :preview-teleported="true"
               hide-on-click-modal
+              loading="lazy"
             >
               <template #error>
                 <div class="image-placeholder">图片加载失败</div>
@@ -183,12 +185,7 @@ function formatSize(s: number | undefined) {
   max-width: 100%;
   color: var(--el-text-color-primary);
 }
-:global(.dark) .bubble { /* placeholder */ }
-.time {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
-}
+.time { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px; }
 .image-container { position: relative; }
 .msg-image { max-width: 360px; max-height: 400px; border-radius: 8px; display: inline-block; vertical-align: top; }
 .image-placeholder { padding: 20px; text-align: center; color: var(--el-text-color-secondary); }
