@@ -4,6 +4,7 @@ import { useChatStore } from '../chat'
 import { useWebSocketStore } from './useWebSocketStore'
 import { useUserStore } from '../user'
 import { recallPrivateMessage, recallGroupMessage } from '../../api/chat'
+import { findTempMessage, findExistingMessage, findExistingBySeq, applyRecall } from '../../composables/useMessageSync'
 import logger from '../../utils/logger'
 import type { UIMessage } from '../../types/message'
 
@@ -339,9 +340,7 @@ export const useMessageActions = defineStore('msgActions', {
         const list = chatStore.messagesByUser[key] || []
 
         if (payload.tempId) {
-          const tempIdx = list.findIndex(
-            (msg) => msg.tempId === payload.tempId || msg.id === payload.tempId
-          )
+          const tempIdx = findTempMessage(list, payload.tempId)
           if (tempIdx !== -1) {
             const newList = [...list]
             newList[tempIdx] = { ...newList[tempIdx], ...uiMsg, id: uiMsg.id, isSending: false, sendError: false }
@@ -351,7 +350,7 @@ export const useMessageActions = defineStore('msgActions', {
           }
         }
 
-        const existIdx = list.findIndex((msg) => msg.id === uiMsg.id)
+        const existIdx = findExistingMessage(list, uiMsg.id)
         if (existIdx !== -1) {
           const newList = [...list]
           newList[existIdx] = { ...newList[existIdx], ...uiMsg }
@@ -461,9 +460,7 @@ export const useMessageActions = defineStore('msgActions', {
         const list = chatStore.messagesByUser[key] || []
 
         if (payload.tempId) {
-          const tempIdx = list.findIndex(
-            (msg) => msg.tempId === payload.tempId || msg.id === payload.tempId
-          )
+          const tempIdx = findTempMessage(list, payload.tempId)
           if (tempIdx !== -1) {
             const newList = [...list]
             newList[tempIdx] = {
@@ -479,7 +476,7 @@ export const useMessageActions = defineStore('msgActions', {
           }
         }
 
-        const existIdx = list.findIndex((msg) => msg.id === uiMsg.id)
+        const existIdx = findExistingMessage(list, uiMsg.id)
         if (existIdx !== -1) {
           const newList = [...list]
           newList[existIdx] = {
@@ -500,8 +497,7 @@ export const useMessageActions = defineStore('msgActions', {
         }
 
         if (uiMsg.messageSeq) {
-          const seqDup = list.some((msg) => msg.messageSeq === uiMsg.messageSeq)
-          if (seqDup) {
+          if (findExistingBySeq(list, uiMsg.messageSeq) !== -1) {
             logger.debug('跳过重复的群聊消息 (messageSeq):', uiMsg.messageSeq)
             return
           }
@@ -540,11 +536,13 @@ export const useMessageActions = defineStore('msgActions', {
       const idx = list.findIndex((m) => m.id === messageId)
       if (idx !== -1) {
         const newList = [...list]
-        newList[idx] = {
-          ...newList[idx],
-          content: payload.recallUserId === selfId ? '你撤回了一条消息' : '对方撤回了一条消息',
-          type: 5,
-          recall: true
+        if (selfId) {
+          newList[idx] = applyRecall(
+            newList[idx],
+            payload.recallUserId as number,
+            selfId,
+            newList[idx].senderNickname || '对方'
+          )
         }
         chatStore.messagesByUser[key] = newList
         logger.debug('已更新撤回消息状态:', messageId)
