@@ -34,7 +34,7 @@
       :friend-name="(friend as any)?.name || (friend as any)?.remark || (friend as any)?.nickname || (friend as any)?.username"
       :self-avatar="currentUserAvatar"
       :self-initial="currentUserInitial"
-      :member-role-map="memberRoleMap"
+      :member-role-map="groupPanelRef?.memberRoleMap || {}"
       @contextmenu="handleRightClick"
       @readd-friend="reAddFriend"
     />
@@ -61,95 +61,12 @@
       </div>
     </div>
 
-    <!-- 群成员列表弹窗 -->
-    <el-dialog v-model="showMembersDialog" title="群成员列表" width="450px" append-to-body>
-      <div v-loading="loadingMembers" class="member-list-container">
-        <div class="member-list-header">
-          <div class="header-right" style="display:flex;gap:10px">
-            <el-button type="danger" size="small" @click="handleExitGroup"><el-icon><SwitchButton /></el-icon>退出群聊</el-button>
-            <el-button v-if="canRemove" type="danger" size="small" @click="openRemoveDialog"><el-icon><Delete /></el-icon>移除成员</el-button>
-            <el-button v-if="canInvite" type="primary" size="small" @click="openInviteDialog"><el-icon><Plus /></el-icon>邀请好友</el-button>
-          </div>
-        </div>
-        <el-scrollbar height="400px">
-          <div v-for="m in memberList" :key="m.userId" class="member-item">
-            <el-avatar :src="m.avatar" :size="40">{{ (m.nickname || m.nicknameInGroup || '').slice(0,1).toUpperCase() }}</el-avatar>
-            <div class="member-info">
-              <div class="member-name">
-                <span class="name-text">{{ m.nicknameInGroup || m.nickname }}</span>
-                <el-tag v-if="m.role===2" size="small" type="warning" effect="dark">群主</el-tag>
-                <el-tag v-else-if="m.role===1" size="small" type="success" effect="dark">管理员</el-tag>
-              </div>
-              <div class="real-name" v-if="m.nicknameInGroup && m.nicknameInGroup !== m.nickname">原名: {{ m.nickname }}</div>
-            </div>
-            <div v-if="currentUserRole===2 && m.userId !== userStore.userInfo?.id" class="member-actions">
-              <el-dropdown trigger="click" @command="(cmd: string) => handleMemberAction(cmd, m)">
-                <el-icon class="action-icon"><MoreFilled /></el-icon>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item v-if="m.role===0" command="setAdmin">设为管理员</el-dropdown-item>
-                    <el-dropdown-item v-if="m.role===1" command="cancelAdmin">取消管理员</el-dropdown-item>
-                    <el-dropdown-item command="transferOwner">转让群主</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
-          </div>
-          <el-empty v-if="!memberList.length && !loadingMembers" description="暂无成员" />
-        </el-scrollbar>
-      </div>
-    </el-dialog>
-
-    <!-- 邀请好友弹窗 -->
-    <el-dialog v-model="showInviteDialog" title="邀请好友入群" width="500px" append-to-body>
-      <div class="invite-container">
-        <el-input v-model="searchKeyword" placeholder="搜索好友" :prefix-icon="Search" clearable class="search-input" />
-        <div class="friend-list">
-          <el-checkbox-group v-model="inviteList">
-            <div v-for="f in filteredFriends" :key="f.id" class="friend-item">
-              <el-checkbox :label="f.id">
-                <div class="friend-info">
-                  <el-avatar :size="32" :src="f.avatar">{{ (f.remark || f.nickname || f.username || '').slice(0,1).toUpperCase() }}</el-avatar>
-                  <span class="name">{{ f.remark || f.nickname || f.username }}</span>
-                </div>
-              </el-checkbox>
-            </div>
-          </el-checkbox-group>
-          <el-empty v-if="!filteredFriends.length" description="暂无可选好友" />
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showInviteDialog=false">取消</el-button>
-        <el-button type="primary" @click="handleInvite" :loading="inviteLoading" :disabled="!inviteList.length">确定邀请 ({{ inviteList.length }})</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 移除成员弹窗 -->
-    <el-dialog v-model="showRemoveDialog" title="移除群成员" width="500px" append-to-body>
-      <div class="invite-container">
-        <el-input v-model="removeSearchKeyword" placeholder="搜索成员" :prefix-icon="Search" clearable class="search-input" />
-        <div class="friend-list">
-          <el-radio-group v-model="removeList" style="width:100%;display:block">
-            <div v-for="m in filteredMembersToRemove" :key="m.userId" class="friend-item">
-              <el-radio :label="m.userId" style="width:100%;display:flex;align-items:center">
-                <div class="friend-info">
-                  <el-avatar :size="32" :src="m.avatar">{{ (m.nicknameInGroup || m.nickname || '').slice(0,1).toUpperCase() }}</el-avatar>
-                  <div class="member-name">
-                    <span class="name">{{ m.nicknameInGroup || m.nickname }}</span>
-                    <el-tag v-if="m.role===1" size="small" type="success" effect="dark" style="margin-left:5px">管理员</el-tag>
-                  </div>
-                </div>
-              </el-radio>
-            </div>
-          </el-radio-group>
-          <el-empty v-if="!filteredMembersToRemove.length" description="暂无可移除成员" />
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showRemoveDialog=false">取消</el-button>
-        <el-button type="danger" @click="handleRemoveMember" :loading="removeLoading" :disabled="!removeList">确定移除</el-button>
-      </template>
-    </el-dialog>
+    <!-- 群成员管理面板 -->
+    <GroupMemberPanel
+      ref="groupPanelRef"
+      v-model="showMembersDialog"
+      :group-id="(friend as any)?.id"
+    />
 
     <!-- 搜索聊天记录抽屉 -->
     <el-drawer v-model="showSearchDrawer" title="查找聊天记录" size="400px" append-to-body>
@@ -176,15 +93,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled, Search, Plus, Delete, SwitchButton, RefreshLeft } from '@element-plus/icons-vue'
+import { MoreFilled, Search, RefreshLeft } from '@element-plus/icons-vue'
 import { useChatStore } from '@/store/chat'
 import { useUserStore } from '@/store/user'
 import { useFriendStore } from '@/store/friend'
 import { searchChatMessages } from '@/api/chat'
-import { getGroupProfile, getGroupMemberList, inviteToGroup, removeGroupMember, exitGroup, updateGroupMemberRole, transferGroupOwner } from '@/api/group'
 import MessageList from './MessageList.vue'
 import MessageInput from './MessageInput.vue'
 import FileUploader from './FileUploader.vue'
+import GroupMemberPanel from './GroupMemberPanel.vue'
 import logger from '@/utils/logger'
 import type { UIMessage } from '@/types/message'
 
@@ -228,133 +145,9 @@ async function handleRecall() {
   showContextMenu.value = false
 }
 
-// Group member state
+// Group member panel
 const showMembersDialog = ref(false)
-const loadingMembers = ref(false)
-const memberList = ref<{ userId: number; nickname?: string; nicknameInGroup?: string; avatar?: string; role: number }[]>([])
-const showInviteDialog = ref(false)
-const inviteList = ref<number[]>([])
-const searchKeyword = ref('')
-const inviteLoading = ref(false)
-const currentGroup = ref<Record<string, unknown> | null>(null)
-const showRemoveDialog = ref(false)
-const removeList = ref<number | null>(null)
-const removeLoading = ref(false)
-const removeSearchKeyword = ref('')
-
-const currentUserRole = computed(() => {
-  if (!userStore.userInfo?.id) return 0
-  const me = memberList.value.find((m) => m.userId === userStore.userInfo!.id)
-  return me ? me.role : 0
-})
-
-const memberRoleMap = computed(() => {
-  const map: Record<string | number, number> = {}
-  memberList.value.forEach((m) => { map[m.userId] = m.role })
-  return map
-})
-
-const canInvite = computed(() => {
-  if (!currentGroup.value) return false
-  return currentUserRole.value >= ((currentGroup.value.invitePolicy as number) || 0)
-})
-
-const canRemove = computed(() => currentUserRole.value > 0)
-
-const filteredFriends = computed(() => {
-  const friends = friendStore.friends.filter((f) => f.type === 0 || f.type === undefined)
-  const memberIds = new Set(memberList.value.map((m) => m.userId))
-  let potential = friends.filter((f) => !memberIds.has(f.id))
-  if (searchKeyword.value) {
-    const k = searchKeyword.value.toLowerCase()
-    potential = potential.filter((f) => (f.remark || '').toLowerCase().includes(k) || (f.nickname || '').toLowerCase().includes(k))
-  }
-  return potential
-})
-
-const filteredMembersToRemove = computed(() => {
-  const currentUserId = userStore.userInfo?.id
-  const myRole = currentUserRole.value
-  let candidates = memberList.value.filter((m) => m.userId !== currentUserId && m.role < myRole)
-  if (removeSearchKeyword.value) {
-    const k = removeSearchKeyword.value.toLowerCase()
-    candidates = candidates.filter((m) => (m.nicknameInGroup || '').toLowerCase().includes(k) || (m.nickname || '').toLowerCase().includes(k))
-  }
-  return candidates
-})
-
-async function fetchMembers() {
-  if (!props.friend?.id) return
-  loadingMembers.value = true
-  try {
-    const [profileRes, membersRes] = await Promise.all([
-      getGroupProfile(props.friend.id as number),
-      getGroupMemberList(props.friend.id as number)
-    ])
-    if (profileRes) currentGroup.value = profileRes as unknown as Record<string, unknown>
-    if (membersRes) memberList.value = membersRes as unknown as typeof memberList.value
-  } catch (e) { logger.error(e); ElMessage.error('获取信息失败') }
-  finally { loadingMembers.value = false }
-}
-
-function openInviteDialog() {
-  if (!friendStore.friends.length) friendStore.fetchFriends()
-  inviteList.value = []; searchKeyword.value = ''; showInviteDialog.value = true
-}
-
-function openRemoveDialog() { removeList.value = null; removeSearchKeyword.value = ''; showRemoveDialog.value = true }
-
-async function handleInvite() {
-  if (!inviteList.value.length) return
-  inviteLoading.value = true
-  try {
-    await inviteToGroup({ groupId: props.friend!.id as number, userIds: inviteList.value })
-    ElMessage.success('邀请成功'); showInviteDialog.value = false; fetchMembers()
-  } catch { ElMessage.error('邀请出错') }
-  finally { inviteLoading.value = false }
-}
-
-async function handleRemoveMember() {
-  if (!removeList.value) return
-  const member = memberList.value.find((m) => m.userId === removeList.value)
-  try { await ElMessageBox.confirm(`确定要将 "${member?.nicknameInGroup || member?.nickname}" 移出群组吗？`, '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }) }
-  catch { return }
-  removeLoading.value = true
-  try {
-    await removeGroupMember({ groupId: props.friend!.id as number, userId: removeList.value })
-    ElMessage.success('移除成员成功'); showRemoveDialog.value = false; fetchMembers()
-  } catch { ElMessage.error('移除出错') }
-  finally { removeLoading.value = false }
-}
-
-async function handleExitGroup() {
-  if (!props.friend?.id) return
-  try { await ElMessageBox.confirm('确定要退出该群聊吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }) }
-  catch { return }
-  try { await exitGroup(props.friend.id as number); ElMessage.success('退出群组成功'); showMembersDialog.value = false; window.location.reload() }
-  catch { ElMessage.error('退出群组出错') }
-}
-
-async function handleMemberAction(command: string, member: { userId: number; nicknameInGroup?: string; nickname?: string }) {
-  const gid = props.friend!.id as number
-  const name = member.nicknameInGroup || member.nickname
-  try {
-    if (command === 'setAdmin') {
-      await ElMessageBox.confirm(`确定要将 "${name}" 设为管理员吗？`, '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' })
-      await updateGroupMemberRole({ groupId: gid, userId: member.userId, role: 1 })
-      ElMessage.success('设置管理员成功')
-    } else if (command === 'cancelAdmin') {
-      await ElMessageBox.confirm(`确定要取消 "${name}" 的管理员身份吗？`, '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
-      await updateGroupMemberRole({ groupId: gid, userId: member.userId, role: 0 })
-      ElMessage.success('取消管理员成功')
-    } else if (command === 'transferOwner') {
-      await ElMessageBox.confirm(`确定要将群主转让给 "${name}" 吗？`, '警告', { confirmButtonText: '确定转让', cancelButtonText: '取消', type: 'warning' })
-      await transferGroupOwner({ groupId: gid, newOwnerId: member.userId })
-      ElMessage.success('转让群主成功')
-    }
-    fetchMembers()
-  } catch { /* cancelled or failed */ }
-}
+const groupPanelRef = ref<any>(null)
 
 // Search
 const showSearchDrawer = ref(false)
@@ -394,7 +187,7 @@ async function handleCommand(command: string) {
   if (command === 'info') {
     if (!props.friend) return
     emit('open-profile', { id: props.friend.id as number, type: (props.friend.type as number || 0) === 1 ? 'group' : 'friend' })
-  } else if (command === 'members') { showMembersDialog.value = true; fetchMembers() }
+  } else if (command === 'members') { showMembersDialog.value = true }
   else if (command === 'search') { showSearchDrawer.value = true; chatSearchKeyword.value = ''; searchResults.value = [] }
 }
 
@@ -432,7 +225,7 @@ onMounted(() => { store.connect(); document.addEventListener('click', handleClic
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside) })
 
 watch(() => (props.friend as Record<string, unknown> | null)?.id, async (newId, oldId) => {
-  if (newId !== oldId && props.friend?.type === 1) fetchMembers()
+  if (newId !== oldId && props.friend?.type === 1) groupPanelRef.value?.fetchMembers()
 }, { immediate: true })
 </script>
 
