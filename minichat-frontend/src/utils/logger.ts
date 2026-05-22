@@ -1,6 +1,6 @@
-const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3, SILENT: 4 }
+const LEVELS: Record<string, number> = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3, SILENT: 4 }
 
-const currentLevel = import.meta.env.DEV ? LEVELS.DEBUG : LEVELS.WARN
+const currentLevel: number = import.meta.env.DEV ? LEVELS.DEBUG : LEVELS.WARN
 
 const noop = () => {}
 

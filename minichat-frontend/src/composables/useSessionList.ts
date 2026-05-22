@@ -1,35 +1,34 @@
+import type { Session } from '../types/session'
+
 /**
  * 会话排序（按最后消息时间倒序）
- * @param {Array} sessions
- * @returns {Array}
  */
-export function sortSessions(sessions) {
+export function sortSessions(sessions: Session[]): Session[] {
   return [...sessions].sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
 }
 
 /**
  * 会话搜索过滤
- * @param {Array} sessions
- * @param {string} keyword
- * @returns {Array}
  */
-export function filterSessions(sessions, keyword) {
+export function filterSessions(sessions: Session[], keyword: string): Session[] {
   if (!keyword) return sessions
   const k = keyword.toLowerCase()
   return sessions.filter(
-    (s) => (s.name || '').toLowerCase().includes(k) || (s.nickname || '').toLowerCase().includes(k)
+    (s) =>
+      (s.name || '').toLowerCase().includes(k) ||
+      ((s as Session & { nickname?: string }).nickname || '').toLowerCase().includes(k)
   )
 }
 
 /**
  * 更新单个会话的未读数和最后消息时间
- * @param {Array} sessions
- * @param {number} sessionId
- * @param {number} type - 0=私聊, 1=群聊
- * @param {object} updates
- * @returns {Array}
  */
-export function updateSessionMeta(sessions, sessionId, type, updates) {
+export function updateSessionMeta(
+  sessions: Session[],
+  sessionId: number,
+  type: number,
+  updates: Partial<Session>
+): Session[] {
   const idx = sessions.findIndex((s) => s.id === sessionId && (s.type || 0) === type)
   if (idx === -1) return sessions
   const updated = [...sessions]

@@ -1,13 +1,12 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
-// 静态导入组件（避免动态导入问题）
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import Main from '../views/Main.vue'
 import Friend from '../views/Friend.vue'
 import GroupApply from '../views/GroupApply.vue'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Main',
@@ -43,9 +42,7 @@ const router = createRouter({
   routes
 })
 
-// 简单的路由守卫
 router.beforeEach((to, from, next) => {
-  // const token = localStorage.getItem('token')
   const token = sessionStorage.getItem('token')
 
   if (to.meta.requiresAuth && !token) {

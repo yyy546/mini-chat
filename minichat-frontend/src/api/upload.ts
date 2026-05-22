@@ -2,12 +2,40 @@ import request from '../utils/request'
 
 const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024
 
-/**
- * 统一文件上传入口（根据 scene 自动选择上传策略）
- * @param {{ file: File, scene: string, bizType?: string, bizId?: number, chatFileType?: number, groupId?: number, onProgress?: (p: number) => void }} options
- * @returns {Promise<{ fileUrl: string, fileName: string, fileSize: number, messageType?: number }>}
- */
-export async function uploadFileUnified(options) {
+interface UploadOptions {
+  file: File
+  scene: string
+  bizType?: string
+  bizId?: number
+  chatFileType?: number
+  groupId?: number
+  onProgress?: (p: number) => void
+}
+
+interface UploadResult {
+  fileUrl: string
+  fileName: string
+  fileSize: number
+  messageType?: number
+}
+
+interface ChunkInitData {
+  uploadId: string
+  chunkSize: number
+  totalChunks: number
+}
+
+interface ChunkStatusData {
+  uploadedChunkIndexList: number[]
+}
+
+interface CompleteData {
+  fileUrl: string
+  fileName?: string
+  fileSize?: number
+}
+
+export async function uploadFileUnified(options: UploadOptions): Promise<UploadResult> {
   const { file, scene, bizType, bizId, chatFileType = 3, groupId, onProgress } = options || {}
   if (!file) {
     throw new Error('文件不能为空')
@@ -36,61 +64,70 @@ export async function uploadFileUnified(options) {
   return uploadLargeFileWithResume({ file, scene, bizType, bizId, chatFileType, onProgress })
 }
 
-async function uploadUserAvatar(file, onProgress) {
+async function uploadUserAvatar(file: File, onProgress?: (p: number) => void): Promise<UploadResult> {
   const formData = new FormData()
   formData.append('avatar', file)
   const res = await request.post('/users/avatar', formData, {
-    onUploadProgress: (e) => {
+    onUploadProgress: (e: { loaded: number; total?: number }) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
   })
   return {
-    fileUrl: res,
+    fileUrl: res as unknown as string,
     fileName: file.name,
     fileSize: file.size
   }
 }
 
-async function uploadGroupAvatar(groupId, file, onProgress) {
+async function uploadGroupAvatar(
+  groupId: number,
+  file: File,
+  onProgress?: (p: number) => void
+): Promise<UploadResult> {
   const formData = new FormData()
   formData.append('avatar', file)
   const res = await request.post(`/group/avatar/${groupId}`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
-    onUploadProgress: (e) => {
+    onUploadProgress: (e: { loaded: number; total?: number }) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
   })
   return {
-    fileUrl: res,
+    fileUrl: res as unknown as string,
     fileName: file.name,
     fileSize: file.size
   }
 }
 
-async function uploadSpaceImage(file, onProgress) {
+async function uploadSpaceImage(file: File, onProgress?: (p: number) => void): Promise<UploadResult> {
   const formData = new FormData()
   formData.append('file', file)
   const res = await request.post('/space/post/upload/image', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
-    onUploadProgress: (e) => {
+    onUploadProgress: (e: { loaded: number; total?: number }) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
   })
   return {
-    fileUrl: res,
+    fileUrl: res as unknown as string,
     fileName: file.name,
     fileSize: file.size
   }
 }
 
-async function uploadChatSmallFile(scene, file, type, onProgress) {
+async function uploadChatSmallFile(
+  scene: string,
+  file: File,
+  type: number,
+  onProgress?: (p: number) => void
+): Promise<UploadResult> {
   const formData = new FormData()
   formData.append('file', file)
   const url = scene === 'groupChat' ? '/chat/group/upload' : '/chat/private/upload'
@@ -99,12 +136,12 @@ async function uploadChatSmallFile(scene, file, type, onProgress) {
     headers: {
       Accept: 'application/json'
     },
-    onUploadProgress: (e) => {
+    onUploadProgress: (e: { loaded: number; total?: number }) => {
       if (!onProgress || !e.total) return
       onProgress((e.loaded / e.total) * 100)
     }
   })
-  const data = res || {}
+  const data = (res || {}) as UploadResult
   return {
     fileUrl: data.fileUrl,
     fileName: data.fileName || file.name,
@@ -113,27 +150,34 @@ async function uploadChatSmallFile(scene, file, type, onProgress) {
   }
 }
 
-async function uploadLargeFileWithResume(options) {
+interface LargeFileOptions {
+  file: File
+  scene: string
+  bizType?: string
+  bizId?: number
+  chatFileType?: number
+  onProgress?: (p: number) => void
+}
+
+async function uploadLargeFileWithResume(options: LargeFileOptions): Promise<UploadResult> {
   const { file, scene, bizType = 'chat-file', bizId, chatFileType = 3, onProgress } = options
 
   const fileHash = await calcSimpleHash(file)
 
-  const initData =
-    (await request.post('/upload/init', {
-      fileName: file.name,
-      fileSize: file.size,
-      fileHash,
-      bizType,
-      bizId
-    })) || {}
+  const initData = ((await request.post('/upload/init', {
+    fileName: file.name,
+    fileSize: file.size,
+    fileHash,
+    bizType,
+    bizId
+  })) || {}) as ChunkInitData
   const uploadId = initData.uploadId
   const chunkSize = initData.chunkSize
   const totalChunks = initData.totalChunks
 
-  const statusData =
-    (await request.get('/upload/status', {
-      params: { uploadId }
-    })) || {}
+  const statusData = ((await request.get('/upload/status', {
+    params: { uploadId }
+  })) || {}) as ChunkStatusData
   const uploadedIndexes = statusData.uploadedChunkIndexList || []
   const uploadedSet = new Set(uploadedIndexes)
 
@@ -158,7 +202,7 @@ async function uploadLargeFileWithResume(options) {
     form.append('file', chunk, file.name)
 
     await request.post('/upload/chunk', form, {
-      onUploadProgress: (e) => {
+      onUploadProgress: (e: { loaded: number; total?: number }) => {
         if (!onProgress) return
         const loaded = e.total ? e.loaded : chunkSizeBytes
         const current = uploadedBytes + loaded
@@ -172,10 +216,9 @@ async function uploadLargeFileWithResume(options) {
     }
   }
 
-  const data =
-    (await request.post('/upload/complete', null, {
-      params: { uploadId }
-    })) || {}
+  const data = ((await request.post('/upload/complete', null, {
+    params: { uploadId }
+  })) || {}) as CompleteData
   const messageType = chatFileType === 2 ? 2 : 3
   return {
     fileUrl: data.fileUrl,
@@ -185,7 +228,7 @@ async function uploadLargeFileWithResume(options) {
   }
 }
 
-async function calcSimpleHash(file) {
+async function calcSimpleHash(file: File): Promise<string> {
   const chunk = file.slice(0, Math.min(file.size, 1024 * 1024))
   const buffer = await chunk.arrayBuffer()
   let hash = 0
