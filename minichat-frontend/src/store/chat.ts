@@ -6,6 +6,7 @@ import { getFriendList } from '../api/friend'
 import { useUserStore } from './user'
 import { useWebSocketStore } from './chat/useWebSocketStore'
 import { useMessageActions } from './chat/useMessageActions'
+import { sortSessions } from '../composables/useSessionList'
 import logger from '../utils/logger'
 import type { UIMessage } from '../types/message'
 import type { Session } from '../types/session'
@@ -89,18 +90,19 @@ export const useChatStore = defineStore('chat', {
           logger.warn('获取好友列表失败，将显示所有会话:', friendErr)
         }
 
-        this.sessions = (list as Record<string, unknown>[])
-          .map((session) => ({
-            id: session.id as number,
-            type: ((session.type as number) || 0) as 0 | 1,
-            name: (session.name as string) || '',
-            avatar: (session.avatar as string) || '',
-            lastMessageTime: session.lastMessageTime
-              ? new Date(session.lastMessageTime as string).getTime()
-              : 0,
-            unreadCount: (session.unreadCount as number) || 0
-          }))
-          .sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
+        this.sessions = sortSessions(
+          (list as Record<string, unknown>[])
+            .map((session) => ({
+              id: session.id as number,
+              type: ((session.type as number) || 0) as 0 | 1,
+              name: (session.name as string) || '',
+              avatar: (session.avatar as string) || '',
+              lastMessageTime: session.lastMessageTime
+                ? new Date(session.lastMessageTime as string).getTime()
+                : 0,
+              unreadCount: (session.unreadCount as number) || 0
+            }))
+        )
 
         const wsStore = useWebSocketStore()
         if (wsStore.isConnected) {
@@ -294,7 +296,7 @@ export const useChatStore = defineStore('chat', {
             lastMessageSeq: nextLastMessageSeq,
             lastReadSeq: nextLastReadSeq
           }
-          this.sessions.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
+          this.sessions = sortSessions(this.sessions)
         }
       }
     },
