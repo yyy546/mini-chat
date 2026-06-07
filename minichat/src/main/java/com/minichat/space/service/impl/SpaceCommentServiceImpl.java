@@ -1,7 +1,8 @@
 package com.minichat.space.service.impl;
 
 import com.minichat.common.constants.SpaceConstants;
-import com.minichat.common.result.Result;
+import com.minichat.common.exception.ForbiddenException;
+import com.minichat.common.exception.NotFoundException;
 import com.minichat.common.util.UserContext;
 import com.minichat.space.dto.PublishSpaceCommentDTO;
 import com.minichat.space.entity.SpaceComment;
@@ -24,15 +25,15 @@ public class SpaceCommentServiceImpl implements SpaceCommentService {
     private final SpaceCommentMapper spaceCommentMapper;
 
     @Override
-    public Result<String> publish(PublishSpaceCommentDTO publishSpaceCommentDTO) {
+    public void publish(PublishSpaceCommentDTO publishSpaceCommentDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if(!currentUserId.equals(publishSpaceCommentDTO.getPublishId())){
-            return Result.error("发布人ID与当前用户ID不一致");
+            throw new ForbiddenException("发布人ID与当前用户ID不一致");
         }
 
         SpacePost spacePost = spacePostMapper.selectById(publishSpaceCommentDTO.getPostId());
         if(spacePost == null || SpaceConstants.DISABLE_STATUS.equals(spacePost.getStatus())){
-            return Result.error("帖子不存在或已被删除");
+            throw new NotFoundException("帖子不存在或已被删除");
         }
 
         SpaceComment spaceComment = SpaceComment.builder()
@@ -44,32 +45,28 @@ public class SpaceCommentServiceImpl implements SpaceCommentService {
                 .build();
         spaceCommentMapper.insert(spaceComment);
 
-        // 增加帖子评论数
         spacePostMapper.updateAddCommentsCountById(spacePost);
-        return Result.success("评论发布成功");
     }
 
     @Override
-    public Result<String> delete(Long commentId) {
+    public void delete(Long commentId) {
         SpaceComment spaceComment = spaceCommentMapper.selectById(commentId);
         if(spaceComment == null || SpaceConstants.DISABLE_STATUS.equals(spaceComment.getStatus())){
-            return Result.error("评论不存在或已被删除");
+            throw new NotFoundException("评论不存在或已被删除");
         }
         if(!spaceComment.getPublishId().equals(UserContext.getCurUserId())){
-            return Result.error("非评论发布人，不能删除");
+            throw new ForbiddenException("非评论发布人，不能删除");
         }
         spaceComment.setStatus(SpaceConstants.DISABLE_STATUS);
         spaceCommentMapper.updateDisableStatusById(spaceComment);
 
-        // 减少帖子评论数
         SpacePost spacePost = spacePostMapper.selectById(spaceComment.getPostId());
         spacePostMapper.updateSubCommentsCountById(spacePost);
-        return Result.success("评论删除成功");
     }
 
     @Override
-    public Result<List<SpaceCommentVO>> list(Long postId) {
+    public List<SpaceCommentVO> list(Long postId) {
         List<SpaceCommentVO> commentList = spaceCommentMapper.selectListByPostId(postId);
-        return Result.success(commentList);
+        return commentList;
     }
 }

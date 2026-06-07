@@ -3,6 +3,8 @@ package com.minichat.friend.service.impl;
 import com.alibaba.fastjson2.TypeReference;
 import com.minichat.common.constants.MqConstants;
 import com.minichat.common.constants.RedisConstants;
+import com.minichat.common.exception.NotFoundException;
+import com.minichat.common.exception.ValidationException;
 import com.minichat.common.util.CacheClient;
 import com.minichat.friend.dto.FriendGroupUpdateDTO;
 import com.minichat.friend.dto.FriendRemarkUpdateDTO;
@@ -105,14 +107,14 @@ public class FriendServiceImpl implements FriendService {
     public void deleteFriend(Long currentUserId, Long friendId) {
         // 校验参数
         if (currentUserId == null || friendId == null) {
-            throw new IllegalArgumentException("用户ID和好友ID不能为空");
+            throw new ValidationException("用户ID和好友ID不能为空");
         }
-        
+
         // 检查好友关系是否存在（双向检查）
         int count1 = friendMapper.selectFriendByUserIdAndFriendId(currentUserId, friendId);
         int count2 = friendMapper.selectFriendByUserIdAndFriendId(friendId, currentUserId);
         if (count1 == 0 && count2 == 0) {
-            throw new IllegalArgumentException("好友关系不存在");
+            throw new NotFoundException("好友关系不存在");
         }
         
         LocalDateTime deletedTime = LocalDateTime.now();

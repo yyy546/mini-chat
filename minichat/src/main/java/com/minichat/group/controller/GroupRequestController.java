@@ -20,17 +20,16 @@ public class GroupRequestController {
 
     private final GroupRequestService groupRequestService;
 
-    //发送群聊申请
     @PostMapping("/send")
     public Result<String> sendGroupRequest(@Valid @RequestBody GroupRequestDTO groupRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if (currentUserId == null) {
             return Result.error("用户未登录");
         }
-        return groupRequestService.sendGroupRequest(groupRequestDTO);
+        String msg = groupRequestService.sendGroupRequest(groupRequestDTO);
+        return Result.success(msg);
     }
 
-    //获取已发送的群聊申请列表
     @GetMapping("/sent")
     public Result<List<SentGroupRequestVO>> getSentGroupRequests() {
         Long currentUserId = UserContext.getCurUserId();
@@ -41,17 +40,16 @@ public class GroupRequestController {
         return Result.success(sentGroupRequestVOList);
     }
 
-    //处理群聊申请
     @PostMapping("/handle")
     public Result<String> handleGroupRequest(@Valid @RequestBody HandleGroupRequestDTO handleGroupRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if (currentUserId == null) {
             return Result.error("用户未登录");
         }
-        return groupRequestService.handleGroupRequest(handleGroupRequestDTO);
+        groupRequestService.handleGroupRequest(handleGroupRequestDTO);
+        return Result.success("处理成功");
     }
 
-    //获取群聊申请列表
     @GetMapping("/list")
     public Result<List<ReceivedGroupRequestVO>> getReceivedGroupRequests() {
         Long currentUserId = UserContext.getCurUserId();

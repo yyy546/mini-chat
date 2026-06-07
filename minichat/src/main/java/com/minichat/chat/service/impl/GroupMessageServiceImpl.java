@@ -11,7 +11,11 @@ import com.minichat.chat.entity.GroupMessage;
 import com.minichat.common.constants.MessageConstants;
 import com.minichat.common.constants.OssConstants;
 import com.minichat.common.constants.RedisConstants;
-import com.minichat.common.result.Result;
+import com.minichat.common.exception.BusinessException;
+import com.minichat.common.exception.ForbiddenException;
+import com.minichat.common.exception.MessageException;
+import com.minichat.common.exception.NotFoundException;
+import com.minichat.common.exception.ValidationException;
 import com.minichat.chat.service.GroupMessageService;
 
 import java.security.Principal;
@@ -51,16 +55,14 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
     private final RabbitTemplate rabbitTemplate;
 
     @Override
-    public Result<String> sendGroupMessage(GroupMessageDTO groupMessageDTO, Principal principal) {
+    public String sendGroupMessage(GroupMessageDTO groupMessageDTO, Principal principal) {
         try {
             Long realSenderId = Long.parseLong(principal.getName());
             groupMessageDTO.setSenderId(realSenderId);
 
-            // 不同类型消息的特有校验
             if (groupMessageDTO.getMessageType() == 1) {
-                // 文本消息：校验内容
                 if (StringUtils.isEmpty(groupMessageDTO.getContent()) || groupMessageDTO.getContent().length() > 2000) {
-                    return Result.error("文本消息内容为空或超过2000字");
+                    throw new ValidationException("文本消息内容为空或超过2000字");
                 }
             } else {
                 String fileUrl = groupMessageDTO.getFileUrl();
@@ -68,7 +70,7 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
                 Long fileSize = groupMessageDTO.getFileSize();
                 boolean valid = validateFile(fileUrl, fileName, fileSize);
                 if(!valid){
-                    return Result.error("文件信息不合法");
+                    throw new ValidationException("文件信息不合法");
                 }
             }
 
@@ -76,27 +78,23 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
             ChatGroup group = chatGroupMapper.selectById(groupMessageDTO.getGroupId());
 
             if (sender == null) {
-                return Result.error("发送方不存在");
+                throw new NotFoundException("发送方不存在");
             }
             if (group == null) {
-                return Result.error("群聊不存在");
+                throw new NotFoundException("群聊不存在");
             }
 
-            // 检查用户是否在群聊中且未被禁言
             int groupMemberCount = groupMemberMapper.selectByGroupIdAndUserId(groupMessageDTO.getGroupId(), realSenderId);
 
             if(groupMemberCount == 0){
-                return Result.error("用户不在群聊中或已被禁言，无法发送消息");
+                throw new ForbiddenException("用户不在群聊中或已被禁言，无法发送消息");
             }
 
-            // 对于文件/图片消息，如果content为空，设置默认值
             String content = groupMessageDTO.getContent();
             if (groupMessageDTO.getMessageType() != 1 && StringUtils.isEmpty(content)) {
                 content = groupMessageDTO.getMessageType() == 2 ? "[图片]" : "[文件]";
             }
 
-            //  存储到数据库
-            //实现单群消息的有序存储
             Long groupId = groupMessageDTO.getGroupId();
             Long messageSeq = redisTemplate.opsForValue().
                     increment(RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + groupId, 1);
@@ -118,7 +116,6 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
             Long messageId = groupMessage.getId();
             log.info("群聊消息保存到数据库成功，messageId：{}", messageId);
 
-            //构建MQDTO
             GroupMessageMQDTO groupMessageMQDTO = GroupMessageMQDTO.builder()
                     .messageId(messageId)
                     .messageSeq(messageSeq)
@@ -135,7 +132,6 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
                     .sendTime(LocalDateTime.now())
                     .build();
 
-            //  发送到MQ队列
             rabbitTemplate.convertAndSend(MqConstants.GROUP_EXCHANGE,
                     MqConstants.GROUP_ROUTING_KEY,
                     groupMessageMQDTO);
@@ -145,24 +141,22 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
                     realSenderId,
                     groupMessageDTO.getGroupId());
 
-            //直接返回成功结果，不等待MQ处理
-            return Result.success("消息发送成功");
+            return "消息发送成功";
 
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e){
             log.error("发送群聊消息异常", e);
-            return Result.error("发送群聊消息失败");
+            throw new MessageException("发送群聊消息失败");
         }
     }
 
     @Override
-    public Result<IPage<GroupMessageVO>> getGroupMessageHistory(Long groupId, Integer page, Integer pageSize) {
+    public IPage<GroupMessageVO> getGroupMessageHistory(Long groupId, Integer page, Integer pageSize) {
 
-        // 默认第一页，每页50条
         Page<GroupMessageVO> pageParam = new Page<>(page != null ? page : 1, pageSize != null ? pageSize : 50);
-        // 查询群聊消息历史记录
         IPage<GroupMessageVO> messagePage = groupMessageMapper.selectByGroupId(pageParam, groupId);
 
-        // 处理撤回消息
         messagePage.getRecords().forEach(message -> {
             if (Objects.equals(message.getIsRecall(), MessageConstants.RECALL)) {
                 message.setContent(MessageConstants.DEFAULT_RECALL_MESSAGE);
@@ -170,53 +164,46 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
             }
         });
 
-        // 返回结果
-        return Result.success(messagePage);
+        return messagePage;
     }
 
     @Override
-    public Result<FileVO> uploadGroupFile(MultipartFile file, Integer type) {
-        // 校验文件类型（前端传入的type仅作为参考，后端会根据实际文件类型自动判断）
+    public FileVO uploadGroupFile(MultipartFile file, Integer type) {
         if (!(MessageConstants.IMAGE.equals(type) || MessageConstants.FILE.equals(type))) {
-            return Result.error("文件类型不合法（2=图片，3=文件）");
+            throw new ValidationException("文件类型不合法（2=图片，3=文件）");
         }
-        // 校验文件是否为空
         if (file.isEmpty()) {
-            return Result.error("上传文件不能为空");
+            throw new ValidationException("上传文件不能为空");
         }
 
         return uploadFileCommon(file, OssConstants.GROUP_IMAGE_PATH, OssConstants.GROUP_FILE_PATH);
     }
 
     @Override
-    public Result<String> markGroupMessageRead(Long groupId) {
+    public void markGroupMessageRead(Long groupId) {
         Long currentUserId = UserContext.getCurUserId();
 
         Object seqObj = redisTemplate.opsForValue().get(RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + groupId);
         Long messageSeq = seqObj != null ? Long.valueOf(seqObj.toString()) : null;
 
         if (messageSeq == null) {
-            return Result.success("群聊消息不存在");
+            return;
         }
 
         groupMemberMapper.updateLastReadMessageId(groupId, currentUserId, messageSeq);
-
-        return Result.success("群聊消息已标记为已读");
     }
 
     @Override
-    public Result<String> recallGroupMessage(Long groupId, Long messageId) {
-        // 校验消息是否存在
+    public void recallGroupMessage(Long groupId, Long messageId) {
         GroupMessage groupMessage = groupMessageMapper.selectById(messageId);
         if (groupMessage == null) {
-            return Result.error("消息不存在");
+            throw new NotFoundException("消息不存在");
         }
 
-        // 校验是否是发送者
         Long senderId = groupMessage.getSenderId();
         Long currentUserId = UserContext.getCurUserId();
         if (!senderId.equals(currentUserId)) {
-            return Result.error("只有发送者才能撤回消息");
+            throw new ForbiddenException("只有发送者才能撤回消息");
         }
 
         LocalDateTime sendTime = groupMessage.getSendTime();
@@ -229,10 +216,9 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
         });
 
         if (!isRecallSuccess) {
-            return Result.error("消息已发送超过撤回时间限制，无法撤回");
+            throw new ValidationException("消息已发送超过撤回时间限制，无法撤回");
         }
 
-        // 构建撤回消息DTO
         RecallMessageDTO recallMessageDTO = RecallMessageDTO.builder()
                 .messageId(messageId)
                 .chatId(groupId)
@@ -241,12 +227,8 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
                 .timestamp(now.toEpochSecond(ZoneOffset.of("+8")))
                 .build();
 
-        // 发送撤回消息到MQ
         rabbitTemplate.convertAndSend(MqConstants.GROUP_RECALL_EXCHANGE,
                 MqConstants.GROUP_RECALL_ROUTING_KEY,
                 recallMessageDTO);
-
-        return Result.success("消息已撤回");
     }
 }
-

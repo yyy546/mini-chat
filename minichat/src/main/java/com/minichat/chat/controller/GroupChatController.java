@@ -24,44 +24,42 @@ public class GroupChatController {
 
     private final GroupMessageService groupMessageService;
 
-    //发送群聊消息
     @SensitiveFilter(replacement = "***")
     @MessageMapping("/chat.group")
     public Result<String> sendGroupMessage(@Valid @Payload GroupMessageDTO groupMessageDTO, Principal principal) {
         if (principal == null) {
             return Result.error("用户未登录");
         }
-        return groupMessageService.sendGroupMessage(groupMessageDTO, principal);
+        String msg = groupMessageService.sendGroupMessage(groupMessageDTO, principal);
+        return Result.success(msg);
     }
 
-    //查看群聊消息历史记录
     @GetMapping("/chat/group/history")
     public Result<IPage<GroupMessageVO>> getGroupMessageHistory(@RequestParam("groupId") Long groupId,
                                                                 @RequestParam(value = "page", defaultValue = "1") Integer page,
                                                                 @RequestParam(value = "pageSize", defaultValue = "50") Integer pageSize) {
-        // 校验参数
         if (groupId == null || groupId <= 0) {
             return Result.error("群聊ID不能为空");
         }
-        return groupMessageService.getGroupMessageHistory(groupId, page, pageSize);
+        IPage<GroupMessageVO> history = groupMessageService.getGroupMessageHistory(groupId, page, pageSize);
+        return Result.success(history);
     }
 
-    // 上传图片或文件到群聊
     @PostMapping("/chat/group/upload")
     public Result<FileVO> uploadGroupFile(@RequestPart("file") MultipartFile file, @RequestParam("type") Integer type) {
-        return groupMessageService.uploadGroupFile(file, type);
+        FileVO fileVO = groupMessageService.uploadGroupFile(file, type);
+        return Result.success(fileVO);
     }
 
-    // 标记群聊消息为已读
     @PostMapping("/chat/group/mark-read")
     public Result<String> markGroupMessageRead(@RequestParam("groupId") Long groupId) {
         if (groupId == null || groupId <= 0) {
             return Result.error("群聊ID不能为空");
         }
-        return groupMessageService.markGroupMessageRead(groupId);
+        groupMessageService.markGroupMessageRead(groupId);
+        return Result.success("群聊消息已标记为已读");
     }
 
-    // 撤回群聊消息
     @PostMapping("/chat/group/recall")
     public Result<String> recallGroupMessage(@RequestParam("groupId") Long groupId, @RequestParam("messageId") Long messageId) {
         if (groupId == null || groupId <= 0) {
@@ -70,6 +68,7 @@ public class GroupChatController {
         if (messageId == null || messageId <= 0) {
             return Result.error("消息ID不能为空");
         }
-        return groupMessageService.recallGroupMessage(groupId, messageId);
+        groupMessageService.recallGroupMessage(groupId, messageId);
+        return Result.success("消息已撤回");
     }
 }
