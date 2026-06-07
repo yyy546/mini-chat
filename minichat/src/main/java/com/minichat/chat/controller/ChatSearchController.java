@@ -24,13 +24,8 @@ public class ChatSearchController {
     @GetMapping
     public Result<List<EsChatMessage>> searchChatMessages(@RequestParam String keyword,
                                                           @RequestParam Integer type, @RequestParam Long targetId){
-        try{
-            Long currentUserId = UserContext.getCurUserId();
-            List<EsChatMessage> esChatMessages = chatSearchService.search(keyword, type, targetId, currentUserId);
-            return Result.success(esChatMessages);
-        }catch (Exception e){
-            log.error("搜索聊天记录失败", e);
-            return Result.error("搜索聊天记录失败");
-        }
+        Long currentUserId = UserContext.getCurUserId();
+        List<EsChatMessage> esChatMessages = chatSearchService.search(keyword, type, targetId, currentUserId);
+        return Result.success(esChatMessages);
     }
 }

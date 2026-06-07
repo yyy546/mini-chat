@@ -20,17 +20,16 @@ public class FriendRequestController {
 
     private final FriendRequestService friendRequestService;
 
-    //发送好友申请
     @PostMapping("/send")
     public Result<String> sendFriendRequest(@Valid @RequestBody FriendRequestDTO friendRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if(currentUserId == null){
             return Result.error("用户未登录");
         }
-        return friendRequestService.sendFriendRequest(friendRequestDTO);
+        String msg = friendRequestService.sendFriendRequest(friendRequestDTO);
+        return Result.success(msg);
     }
 
-    //获取已发送好友申请列表
     @GetMapping("/sent")
     public Result<List<SentFriendRequestVO>> getSentFriendRequests() {
         Long currentUserId = UserContext.getCurUserId();
@@ -38,17 +37,16 @@ public class FriendRequestController {
         return Result.success(sentFriendRequestVOList);
     }
 
-    //处理好友申请
     @PostMapping("/handle")
     public Result<String> handleFriendRequest(@Valid @RequestBody HandleFriendRequestDTO handleFriendRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if(currentUserId == null){
             return Result.error("用户未登录");
         }
-        return friendRequestService.handleFriendRequest(handleFriendRequestDTO);
+        friendRequestService.handleFriendRequest(handleFriendRequestDTO);
+        return Result.success("处理成功");
     }
 
-    //获取好友申请列表
     @GetMapping("/list")
     public Result<List<FriendRequestVO>> getFriendRequestList() {
         Long currentUserId = UserContext.getCurUserId();

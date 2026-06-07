@@ -18,55 +18,55 @@ public class SpacePostController {
 
     private final SpacePostService spacePostService;
 
-    // 发布空间帖子
     @PostMapping("/publish")
     public Result<String> publish(@Valid @RequestBody PublishSpacePostDTO publishSpacePostDTO){
-        return spacePostService.publish(publishSpacePostDTO);
+        spacePostService.publish(publishSpacePostDTO);
+        return Result.success("发布成功");
     }
 
-    // 上传图片
     @PostMapping("/upload/image")
     public Result<String> uploadImage(@RequestPart("file") MultipartFile file) {
-        return spacePostService.uploadImage(file);
+        String url = spacePostService.uploadImage(file);
+        return Result.success("上传成功", url);
     }
 
-    // 获取某个好友的空间帖子列表
     @GetMapping("/list")
     public Result<List<SpacePostVO>> list(@RequestParam Long userId, @RequestParam Long friendId) {
         if(userId == null || friendId == null){
             return Result.error("用户ID或好友ID不能为空");
         }
-        return spacePostService.list(userId, friendId);
+        List<SpacePostVO> list = spacePostService.list(userId, friendId);
+        return Result.success(list);
     }
 
-    //删除空间帖子
     @DeleteMapping("/delete")
     public Result<String> delete(@RequestParam Long postId){
-        return spacePostService.delete(postId);
+        spacePostService.delete(postId);
+        return Result.success("删除成功");
     }
 
-    //恢复空间帖子
     @PutMapping("/recover")
     public Result<String> recover(@RequestParam Long postId){
-        return spacePostService.recover(postId);
+        spacePostService.recover(postId);
+        return Result.success("恢复成功");
     }
 
-    //查看已删除的空间帖子列表
     @GetMapping("/deleted/list")
     public Result<List<SpacePostVO>> deletedList(@RequestParam Long userId) {
         if(userId == null){
             return Result.error("用户ID不能为空");
         }
-        return spacePostService.deletedList(userId);
+        List<SpacePostVO> list = spacePostService.deletedList(userId);
+        return Result.success(list);
     }
 
-    //切换点赞状态
     @PostMapping("/change/like")
     public Result<String> changeLikeStatus(@RequestParam Long postId){
         if(postId == null){
             return Result.error("帖子ID不能为空");
         }
-        return spacePostService.changeLikeStatus(postId);
+        spacePostService.changeLikeStatus(postId);
+        return Result.success("操作成功");
     }
 
 }

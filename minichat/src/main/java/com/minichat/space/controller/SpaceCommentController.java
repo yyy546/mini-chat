@@ -17,21 +17,21 @@ public class SpaceCommentController {
 
     private final SpaceCommentService spaceCommentService;
 
-    // 发布空间评论
     @PostMapping("/publish")
     public Result<String> publishSpaceComment(@Valid @RequestBody PublishSpaceCommentDTO publishSpaceCommentDTO) {
-        return spaceCommentService.publish(publishSpaceCommentDTO);
+        spaceCommentService.publish(publishSpaceCommentDTO);
+        return Result.success("评论发布成功");
     }
 
-    // 删除空间评论
     @DeleteMapping("/delete")
     public Result<String> delete(@RequestParam Long commentId){
-        return spaceCommentService.delete(commentId);
+        spaceCommentService.delete(commentId);
+        return Result.success("评论删除成功");
     }
 
-    // 获取空间评论列表
     @GetMapping("/list")
     public Result<List<SpaceCommentVO>> list(@RequestParam Long postId){
-        return spaceCommentService.list(postId);
+        List<SpaceCommentVO> list = spaceCommentService.list(postId);
+        return Result.success(list);
     }
 }
