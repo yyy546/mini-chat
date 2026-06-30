@@ -3,11 +3,9 @@ package com.minichat.space.service.impl;
 import com.alibaba.fastjson2.JSONArray;
 import com.minichat.common.constants.MqConstants;
 import com.minichat.common.constants.SpaceConstants;
-import com.minichat.common.exception.AuthException;
-import com.minichat.common.exception.FileException;
-import com.minichat.common.exception.ForbiddenException;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.common.exception.ValidationException;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.SpaceException;
+import com.minichat.common.util.OssFileUtil;
 import com.minichat.common.util.UserContext;
 import com.minichat.friend.mapper.FriendMapper;
 import com.minichat.space.dto.PublishSpacePostDTO;
@@ -19,15 +17,14 @@ import com.minichat.space.mapper.SpacePostMapper;
 import com.minichat.space.service.SpacePostService;
 import com.minichat.space.vo.SpacePostVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import com.minichat.common.util.OssFileUtil;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
-import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -49,7 +46,7 @@ public class SpacePostServiceImpl implements SpacePostService {
     @Override
     public String uploadImage(MultipartFile file) {
         if (file.isEmpty()) {
-            throw new ValidationException("上传文件不能为空");
+            throw new SpaceException(ErrorCode.BAD_REQUEST, "上传文件不能为空");
         }
         try {
             String originalFilename = file.getOriginalFilename();
@@ -58,25 +55,25 @@ public class SpacePostServiceImpl implements SpacePostService {
                 extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
             }
             if (!OssFileUtil.isImageFile(extension, file.getContentType())) {
-                throw new ValidationException("只能上传图片文件");
+                throw new SpaceException(ErrorCode.BAD_REQUEST, "只能上传图片文件");
             }
 
             String url = ossFileUtil.uploadFile(file, spacePostPath);
             return url;
         } catch (IOException e) {
             log.error("空间图片上传失败", e);
-            throw new FileException("图片上传失败");
+            throw new SpaceException(ErrorCode.INTERNAL_ERROR, "图片上传失败");
         }
     }
 
     @Override
     public List<SpacePostVO> list(Long userId, Long friendId) {
         Long currentUserId = UserContext.getCurUserId();
-        if(!currentUserId.equals(userId)){
-            throw new ValidationException("用户ID错误");
+        if (!currentUserId.equals(userId)) {
+            throw new SpaceException(ErrorCode.BAD_REQUEST, "用户ID错误");
         }
-        if(!friendMapper.isFriend(userId, friendId)){
-            throw new ForbiddenException("不是好友关系");
+        if (!friendMapper.isFriend(userId, friendId)) {
+            throw new SpaceException(ErrorCode.FORBIDDEN, "不是好友关系");
         }
         List<SpacePostVO> spacePostVOList = spacePostMapper.selectListByAuthorId(friendId, currentUserId);
 
@@ -114,22 +111,22 @@ public class SpacePostServiceImpl implements SpacePostService {
     @Override
     public List<SpacePostVO> deletedList(Long userId) {
         Long currentUserId = UserContext.getCurUserId();
-        if(!currentUserId.equals(userId)){
-            throw new ValidationException("用户ID错误");
+        if (!currentUserId.equals(userId)) {
+            throw new SpaceException(ErrorCode.BAD_REQUEST, "用户ID错误");
         }
         List<SpacePostVO> spacePostVOList = spacePostMapper.selectListByUserIdWithDisabledStatus(userId, SpaceConstants.DISABLE_STATUS, currentUserId);
 
         return spacePostVOList;
     }
 
-    private SpacePost validatePostOwnership(Long postId){
+    private SpacePost validatePostOwnership(Long postId) {
         Long userId = UserContext.getCurUserId();
         SpacePost spacePost = spacePostMapper.selectById(postId);
-        if(spacePost == null){
-            throw new NotFoundException("帖子不存在");
+        if (spacePost == null) {
+            throw new SpaceException(ErrorCode.POST_NOT_FOUND, "帖子不存在");
         }
-        if(!spacePost.getAuthorId().equals(userId)){
-            throw new ForbiddenException("用户ID错误");
+        if (!spacePost.getAuthorId().equals(userId)) {
+            throw new SpaceException(ErrorCode.POST_PERMISSION_DENIED, "用户ID错误");
         }
         return spacePost;
     }
@@ -138,15 +135,15 @@ public class SpacePostServiceImpl implements SpacePostService {
     @Transactional
     public void changeLikeStatus(Long postId) {
         Long curUserId = UserContext.getCurUserId();
-        if(curUserId == null){
-            throw new AuthException("用户未登录");
+        if (curUserId == null) {
+            throw new SpaceException(ErrorCode.UNAUTHORIZED, "用户未登录");
         }
         SpacePost spacePost = spacePostMapper.selectById(postId);
-        if(spacePost == null || SpaceConstants.DISABLE_STATUS.equals(spacePost.getStatus())){
-            throw new NotFoundException("帖子不存在或已被删除");
+        if (spacePost == null || SpaceConstants.DISABLE_STATUS.equals(spacePost.getStatus())) {
+            throw new SpaceException(ErrorCode.POST_NOT_FOUND, "帖子不存在或已被删除");
         }
         int deletedRows = spaceLikeMapper.deleteByPostIdAndUserId(postId, curUserId);
-        if(deletedRows > 0){
+        if (deletedRows > 0) {
             spacePostMapper.decrementLikesCount(postId, LocalDateTime.now());
             return;
         }
@@ -157,15 +154,15 @@ public class SpacePostServiceImpl implements SpacePostService {
                 .createdTime(LocalDateTime.now())
                 .build();
         int insertedRows = spaceLikeMapper.insertIgnore(newSpaceLike);
-        if(insertedRows > 0){
+        if (insertedRows > 0) {
             spacePostMapper.incrementLikesCount(postId, LocalDateTime.now());
         }
     }
 
     @Override
     public void publish(PublishSpacePostDTO publishSpacePostDTO) {
-        if(publishSpacePostDTO.getContent() == null && (publishSpacePostDTO.getImages() == null || publishSpacePostDTO.getImages().isEmpty())){
-            throw new ValidationException("发布内容不能为空");
+        if (publishSpacePostDTO.getContent() == null && (publishSpacePostDTO.getImages() == null || publishSpacePostDTO.getImages().isEmpty())) {
+            throw new SpaceException(ErrorCode.BAD_REQUEST, "发布内容不能为空");
         }
 
         JSONArray imagesArray = null;
@@ -187,7 +184,7 @@ public class SpacePostServiceImpl implements SpacePostService {
                 .build();
 
         spacePostMapper.insert(spacePost);
-        //
+
         SpacePostMqDTO spacePostMqDTO = SpacePostMqDTO.builder()
                 .spacePostId(spacePost.getId())
                 .authorId(spacePost.getAuthorId())

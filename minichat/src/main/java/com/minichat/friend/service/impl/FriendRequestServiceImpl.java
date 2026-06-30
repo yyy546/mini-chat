@@ -1,26 +1,24 @@
 package com.minichat.friend.service.impl;
 
+import com.minichat.common.constants.FriendConstants;
 import com.minichat.common.constants.RedisConstants;
-import com.minichat.common.exception.DuplicateException;
-import com.minichat.common.exception.ForbiddenException;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.common.exception.ValidationException;
+import com.minichat.common.constants.RequestConstants;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.FriendException;
 import com.minichat.common.util.CacheClient;
+import com.minichat.common.util.UserContext;
 import com.minichat.friend.dto.FriendRequestDTO;
 import com.minichat.friend.dto.HandleFriendRequestDTO;
-import com.minichat.friend.vo.FriendRequestVO;
-import com.minichat.friend.vo.SentFriendRequestVO;
-import com.minichat.common.constants.FriendConstants;
-import com.minichat.common.constants.RequestConstants;
 import com.minichat.friend.entity.Friend;
 import com.minichat.friend.entity.FriendRequest;
 import com.minichat.friend.mapper.FriendMapper;
 import com.minichat.friend.mapper.FriendRequestMapper;
 import com.minichat.friend.service.FriendRequestService;
+import com.minichat.friend.vo.FriendRequestVO;
+import com.minichat.friend.vo.SentFriendRequestVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import com.minichat.common.util.UserContext;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -37,15 +35,15 @@ public class FriendRequestServiceImpl implements FriendRequestService {
     @Override
     public String sendFriendRequest(FriendRequestDTO friendRequestDTO) {
         if (UserContext.getCurUserId().equals(friendRequestDTO.getToUserId())) {
-            throw new ValidationException("不能申请自己为好友");
+            throw new FriendException(ErrorCode.FRIEND_SELF_REQUEST, "不能申请自己为好友");
         }
         int count = friendMapper.selectFriendByUserIdAndFriendId(UserContext.getCurUserId(), friendRequestDTO.getToUserId())
                 + friendMapper.selectFriendByUserIdAndFriendId(friendRequestDTO.getToUserId(), UserContext.getCurUserId());
-        if(count != 0){
-            throw new DuplicateException("已添加为好友，无需重复申请");
+        if (count != 0) {
+            throw new FriendException(ErrorCode.FRIEND_ALREADY_EXISTS, "已添加为好友，无需重复申请");
         }
         FriendRequest request = friendRequestMapper.selectByFromUserIdAndToUserId(UserContext.getCurUserId(), friendRequestDTO.getToUserId());
-        if(request != null && RequestConstants.PROCESSING.equals(request.getStatus())){
+        if (request != null && RequestConstants.PROCESSING.equals(request.getStatus())) {
             return "已发送好友申请，请等待对方处理";
         } else if (request != null && RequestConstants.REJECTED.equals(request.getStatus())) {
 
@@ -70,13 +68,13 @@ public class FriendRequestServiceImpl implements FriendRequestService {
         FriendRequest friendRequest = friendRequestMapper.selectById(handleFriendRequestDTO.getRequestId());
 
         if (friendRequest == null) {
-            throw new NotFoundException("好友申请不存在");
+            throw new FriendException(ErrorCode.FRIEND_NOT_FOUND, "好友申请不存在");
         }
 
         friendRequest.setProcessedTime(LocalDateTime.now());
 
         if (!friendRequest.getToUserId().equals(UserContext.getCurUserId())) {
-            throw new ForbiddenException("无权处理该好友申请");
+            throw new FriendException(ErrorCode.FORBIDDEN, "无权处理该好友申请");
         }
 
         if (RequestConstants.SUCCESS.equals(handleFriendRequestDTO.getStatus())) {
@@ -141,7 +139,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
             }
 
             friendRequestMapper.delete(friendRequest.getId());
-        }else{
+        } else {
             friendRequest.setStatus(handleFriendRequestDTO.getStatus());
             friendRequestMapper.update(friendRequest);
         }
@@ -149,16 +147,16 @@ public class FriendRequestServiceImpl implements FriendRequestService {
 
     @Override
     public List<FriendRequestVO> getFriendRequestList(Long currentUserId) {
-        if(currentUserId == null){
-            throw new ValidationException("当前用户未登录");
+        if (currentUserId == null) {
+            throw new FriendException(ErrorCode.BAD_REQUEST, "当前用户未登录");
         }
         return friendRequestMapper.selectReceivedRequests(currentUserId);
     }
 
     @Override
     public List<SentFriendRequestVO> getSentFriendRequestList(Long currentUserId) {
-        if(currentUserId == null){
-            throw new ValidationException("当前用户未登录");
+        if (currentUserId == null) {
+            throw new FriendException(ErrorCode.BAD_REQUEST, "当前用户未登录");
         }
         return friendRequestMapper.selectSentRequests(currentUserId);
     }

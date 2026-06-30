@@ -1,7 +1,15 @@
 package com.minichat.common.exception;
 
 public class FileException extends BusinessException {
+    public FileException(ErrorCode errorCode) {
+        super(errorCode);
+    }
+
+    public FileException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
+
     public FileException(String message) {
-        super(500, message);
+        super(ErrorCode.INTERNAL_ERROR, message);
     }
 }

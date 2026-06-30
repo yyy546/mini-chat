@@ -10,7 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.security.Principal;
 
 public interface GroupMessageService {
-    String sendGroupMessage(@Valid GroupMessageDTO groupMessageDTO, Principal principal);
+    void sendGroupMessage(@Valid GroupMessageDTO groupMessageDTO, Principal principal);
 
     IPage<GroupMessageVO> getGroupMessageHistory(Long groupId, Integer page, Integer pageSize);
 

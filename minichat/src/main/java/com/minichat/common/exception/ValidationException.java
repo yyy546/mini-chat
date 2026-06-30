@@ -1,7 +1,15 @@
 package com.minichat.common.exception;
 
 public class ValidationException extends BusinessException {
+    public ValidationException(ErrorCode errorCode) {
+        super(errorCode);
+    }
+
+    public ValidationException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
+
     public ValidationException(String message) {
-        super(400, message);
+        super(ErrorCode.BAD_REQUEST, message);
     }
 }

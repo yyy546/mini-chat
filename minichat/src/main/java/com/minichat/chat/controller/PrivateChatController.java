@@ -1,14 +1,16 @@
 package com.minichat.chat.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.minichat.chat.dto.PrivateMessageDTO;
+import com.minichat.chat.service.PrivateMessageService;
 import com.minichat.chat.vo.FileVO;
 import com.minichat.chat.vo.PrivateMessageVO;
-import com.minichat.chat.dto.PrivateMessageDTO;
 import com.minichat.common.annotation.SensitiveFilter;
+import com.minichat.common.exception.AuthException;
+import com.minichat.common.exception.ValidationException;
 import com.minichat.common.result.Result;
-import com.minichat.chat.service.PrivateMessageService;
-import com.minichat.user.service.UserOnlineStatusService;
 import com.minichat.common.util.UserContext;
+import com.minichat.user.service.UserOnlineStatusService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,10 +38,10 @@ public class PrivateChatController {
     @MessageMapping("/chat.private")
     public Result<String> sendPrivateMessage(@Valid @Payload PrivateMessageDTO privateMessageDTO, Principal principal) {
         if (principal == null) {
-            return Result.error("用户未登录");
+            throw new AuthException("用户未登录");
         }
-        String msg = privateMessageService.sendPrivateMessage(privateMessageDTO, principal);
-        return Result.success(msg);
+        privateMessageService.sendPrivateMessage(privateMessageDTO, principal);
+        return Result.success("消息发送成功");
     }
 
     @PostMapping("/chat/private/upload")
@@ -49,19 +51,14 @@ public class PrivateChatController {
     }
 
     @MessageMapping("/heartbeat")
-    public void handleHeartbeat(Principal principal){
-        if(principal != null && principal.getName() != null){
-            try{
-                Long userId = Long.valueOf(principal.getName());
-                userOnlineStatusService.renewUserOnlineStatus(userId);
-
-                log.info("用户 {} 刷新了在线状态", userId);
-            }catch(NumberFormatException e){
-                log.info("用户ID {} 格式错误", principal.getName());
-            }
-        }else{
-                log.info("用户ID不能为空");
+    public void handleHeartbeat(Principal principal) {
+        if (principal == null || principal.getName() == null) {
+            log.info("用户ID不能为空");
+            return;
         }
+        Long userId = Long.valueOf(principal.getName());
+        userOnlineStatusService.renewUserOnlineStatus(userId);
+        log.info("用户 {} 刷新了在线状态", userId);
     }
 
     @GetMapping("/chat/private/history")
@@ -70,7 +67,7 @@ public class PrivateChatController {
                                                                      @RequestParam(value = "pageSize", defaultValue = "50") Integer pageSize) {
         Long currentUserId = UserContext.getCurUserId();
         if (userId == null || userId <= 0) {
-            return Result.error("聊天对象ID不能为空");
+            throw new ValidationException("聊天对象ID不能为空");
         }
         IPage<PrivateMessageVO> history = privateMessageService.getPrivateMessageHistory(currentUserId, userId, page, pageSize);
         return Result.success(history);
@@ -80,7 +77,7 @@ public class PrivateChatController {
     public Result<String> markMessagesAsRead(@RequestParam("receiverId") Long receiverId) {
         Long currentUserId = UserContext.getCurUserId();
         if (receiverId == null || receiverId <= 0) {
-            return Result.error("聊天对象ID不能为空");
+            throw new ValidationException("聊天对象ID不能为空");
         }
         privateMessageService.markMessagesAsRead(currentUserId, receiverId);
         return Result.success("消息标记为已读");
@@ -90,7 +87,7 @@ public class PrivateChatController {
     public Result<String> recallPrivateMessage(@RequestParam("messageId") Long messageId){
         Long currentUserId = UserContext.getCurUserId();
         if (messageId == null || messageId <= 0) {
-            return Result.error("消息ID不能为空");
+            throw new ValidationException("消息ID不能为空");
         }
         privateMessageService.recallPrivateMessage(currentUserId, messageId);
         return Result.success("消息撤回成功");

@@ -3,17 +3,17 @@ package com.minichat.friend.service.impl;
 import com.alibaba.fastjson2.TypeReference;
 import com.minichat.common.constants.MqConstants;
 import com.minichat.common.constants.RedisConstants;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.common.exception.ValidationException;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.FriendException;
 import com.minichat.common.util.CacheClient;
 import com.minichat.friend.dto.FriendGroupUpdateDTO;
 import com.minichat.friend.dto.FriendRemarkUpdateDTO;
+import com.minichat.friend.mapper.FriendMapper;
+import com.minichat.friend.service.FriendService;
 import com.minichat.friend.vo.FriendDetailVO;
 import com.minichat.friend.vo.FriendGroupItemVO;
 import com.minichat.friend.vo.FriendGroupVO;
 import com.minichat.friend.vo.FriendVO;
-import com.minichat.friend.mapper.FriendMapper;
-import com.minichat.friend.service.FriendService;
 import com.minichat.space.dto.SpacePostMqDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -47,11 +47,10 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public void updateFriendRemark(Long currentUserId, FriendRemarkUpdateDTO friendRemarkUpdateDTO) {
-        if(friendRemarkUpdateDTO.getRemarkName() != null && friendRemarkUpdateDTO.getRemarkName().trim().isEmpty()){
+        if (friendRemarkUpdateDTO.getRemarkName() != null && friendRemarkUpdateDTO.getRemarkName().trim().isEmpty()) {
             friendRemarkUpdateDTO.setRemarkName(null);
         }
         friendMapper.updateFriendRemark(currentUserId, friendRemarkUpdateDTO);
-        // Cache-Aside: 删除缓存
         cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + currentUserId);
         cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + currentUserId + ":" + friendRemarkUpdateDTO.getFriendId());
     }
@@ -67,24 +66,19 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public List<FriendGroupItemVO> getFriendGroupItemList(Long currentUserId, String groupName) {
-//        //获取好友分组下的好友列表
         List<FriendGroupItemVO> friendGroupItemVOList = friendMapper.selectFriendGroupItemList(currentUserId, groupName);
 
-        //获取好友分组下的好友id列表
         List<Long> friendIds = friendGroupItemVOList.stream()
                 .map(FriendGroupItemVO::getFriendId)
                 .toList();
 
-        //根据好友id列表构建redis key列表
         List<String> redisKeys = friendIds.stream()
                 .map(id -> "user:online:" + id)
                 .collect(Collectors.toList());
 
-        //从redis中批量获取好友的在线状态
         List<Object> onlineStatusList = redisTemplate.opsForValue().multiGet(redisKeys);
 
-        //将获取到的在线状态设置到好友分组下的好友列表中
-        for(int i = 0; i < friendGroupItemVOList.size(); i++){
+        for (int i = 0; i < friendGroupItemVOList.size(); i++) {
             FriendGroupItemVO friendGroupItemVO = friendGroupItemVOList.get(i);
             Object status = onlineStatusList.get(i);
             friendGroupItemVO.setOnlineStatus(status != null);
@@ -105,47 +99,37 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public void deleteFriend(Long currentUserId, Long friendId) {
-        // 校验参数
         if (currentUserId == null || friendId == null) {
-            throw new ValidationException("用户ID和好友ID不能为空");
+            throw new FriendException(ErrorCode.BAD_REQUEST, "用户ID和好友ID不能为空");
         }
 
-        // 检查好友关系是否存在（双向检查）
         int count1 = friendMapper.selectFriendByUserIdAndFriendId(currentUserId, friendId);
         int count2 = friendMapper.selectFriendByUserIdAndFriendId(friendId, currentUserId);
         if (count1 == 0 && count2 == 0) {
-            throw new NotFoundException("好友关系不存在");
+            throw new FriendException(ErrorCode.FRIEND_NOT_FOUND, "好友关系不存在");
         }
-        
+
         LocalDateTime deletedTime = LocalDateTime.now();
-        
-        // 删除当前用户的好友关系（如果存在）
+
         if (count1 > 0) {
             friendMapper.deleteFriend(currentUserId, friendId, deletedTime);
         }
-        
-        // 删除对方的好友关系（双向删除，如果存在）
+
         if (count2 > 0) {
             friendMapper.deleteFriend(friendId, currentUserId, deletedTime);
         }
 
-        // Cache-Aside: 删除缓存(双向删除)
-        // 删除当前用户的好友列表缓存
         cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + currentUserId);
         cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + currentUserId + ":" + friendId);
         cacheClient.delete(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX + currentUserId);
-        // 删除好友的好友列表缓存
         cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + friendId);
         cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + friendId + ":" + currentUserId);
         cacheClient.delete(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX + friendId);
-        /*
-        * 异步删除朋友圈帖子
-        * */
+
         SpacePostMqDTO spacePostMqDTO1 = SpacePostMqDTO.builder()
                 .authorId(friendId)
                 .targetUserId(currentUserId)
                 .build();
-        // 发送到MQ
         rabbitTemplate.convertAndSend(MqConstants.SPACE_POST_EXCHANGE,
                 MqConstants.SPACE_POST_DELETEALL_ROUTING_KEY,
                 spacePostMqDTO1);
@@ -153,7 +137,6 @@ public class FriendServiceImpl implements FriendService {
                 .authorId(currentUserId)
                 .targetUserId(friendId)
                 .build();
-        // 发送到MQ
         rabbitTemplate.convertAndSend(MqConstants.SPACE_POST_EXCHANGE,
                 MqConstants.SPACE_POST_DELETEALL_ROUTING_KEY,
                 spacePostMqDTO2);
@@ -162,7 +145,6 @@ public class FriendServiceImpl implements FriendService {
     @Override
     public void updateFriendGroup(Long currentUserId, FriendGroupUpdateDTO friendGroupUpdateDTO) {
         friendMapper.updateFriendGroup(currentUserId, friendGroupUpdateDTO);
-        // Cache-Aside: 删除缓存
         cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + currentUserId);
         cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + currentUserId + ":" + friendGroupUpdateDTO.getFriendId());
         cacheClient.delete(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX + currentUserId);

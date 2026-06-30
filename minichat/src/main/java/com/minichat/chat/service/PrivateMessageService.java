@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.security.Principal;
 
 public interface PrivateMessageService {
-    String sendPrivateMessage(PrivateMessageDTO privateMessageDTO, Principal principal);
+    void sendPrivateMessage(PrivateMessageDTO privateMessageDTO, Principal principal);
 
     IPage<PrivateMessageVO> getPrivateMessageHistory(Long currentUserId, Long targetUserId, Integer page, Integer pageSize);
 

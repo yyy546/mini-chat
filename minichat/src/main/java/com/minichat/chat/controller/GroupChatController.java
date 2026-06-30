@@ -2,11 +2,13 @@ package com.minichat.chat.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.minichat.chat.dto.GroupMessageDTO;
+import com.minichat.chat.service.GroupMessageService;
 import com.minichat.chat.vo.FileVO;
 import com.minichat.chat.vo.GroupMessageVO;
 import com.minichat.common.annotation.SensitiveFilter;
+import com.minichat.common.exception.AuthException;
+import com.minichat.common.exception.ValidationException;
 import com.minichat.common.result.Result;
-import com.minichat.chat.service.GroupMessageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +30,10 @@ public class GroupChatController {
     @MessageMapping("/chat.group")
     public Result<String> sendGroupMessage(@Valid @Payload GroupMessageDTO groupMessageDTO, Principal principal) {
         if (principal == null) {
-            return Result.error("用户未登录");
+            throw new AuthException("用户未登录");
         }
-        String msg = groupMessageService.sendGroupMessage(groupMessageDTO, principal);
-        return Result.success(msg);
+        groupMessageService.sendGroupMessage(groupMessageDTO, principal);
+        return Result.success("消息发送成功");
     }
 
     @GetMapping("/chat/group/history")
@@ -39,7 +41,7 @@ public class GroupChatController {
                                                                 @RequestParam(value = "page", defaultValue = "1") Integer page,
                                                                 @RequestParam(value = "pageSize", defaultValue = "50") Integer pageSize) {
         if (groupId == null || groupId <= 0) {
-            return Result.error("群聊ID不能为空");
+            throw new ValidationException("群聊ID不能为空");
         }
         IPage<GroupMessageVO> history = groupMessageService.getGroupMessageHistory(groupId, page, pageSize);
         return Result.success(history);
@@ -54,7 +56,7 @@ public class GroupChatController {
     @PostMapping("/chat/group/mark-read")
     public Result<String> markGroupMessageRead(@RequestParam("groupId") Long groupId) {
         if (groupId == null || groupId <= 0) {
-            return Result.error("群聊ID不能为空");
+            throw new ValidationException("群聊ID不能为空");
         }
         groupMessageService.markGroupMessageRead(groupId);
         return Result.success("群聊消息已标记为已读");
@@ -63,10 +65,10 @@ public class GroupChatController {
     @PostMapping("/chat/group/recall")
     public Result<String> recallGroupMessage(@RequestParam("groupId") Long groupId, @RequestParam("messageId") Long messageId) {
         if (groupId == null || groupId <= 0) {
-            return Result.error("群聊ID不能为空");
+            throw new ValidationException("群聊ID不能为空");
         }
         if (messageId == null || messageId <= 0) {
-            return Result.error("消息ID不能为空");
+            throw new ValidationException("消息ID不能为空");
         }
         groupMessageService.recallGroupMessage(groupId, messageId);
         return Result.success("消息已撤回");
