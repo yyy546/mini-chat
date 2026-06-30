@@ -1,8 +1,8 @@
 package com.minichat.space.service.impl;
 
 import com.minichat.common.constants.SpaceConstants;
-import com.minichat.common.exception.ForbiddenException;
-import com.minichat.common.exception.NotFoundException;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.SpaceException;
 import com.minichat.common.util.UserContext;
 import com.minichat.space.dto.PublishSpaceCommentDTO;
 import com.minichat.space.entity.SpaceComment;
@@ -27,13 +27,13 @@ public class SpaceCommentServiceImpl implements SpaceCommentService {
     @Override
     public void publish(PublishSpaceCommentDTO publishSpaceCommentDTO) {
         Long currentUserId = UserContext.getCurUserId();
-        if(!currentUserId.equals(publishSpaceCommentDTO.getPublishId())){
-            throw new ForbiddenException("发布人ID与当前用户ID不一致");
+        if (!currentUserId.equals(publishSpaceCommentDTO.getPublishId())) {
+            throw new SpaceException(ErrorCode.POST_PERMISSION_DENIED, "发布人ID与当前用户ID不一致");
         }
 
         SpacePost spacePost = spacePostMapper.selectById(publishSpaceCommentDTO.getPostId());
-        if(spacePost == null || SpaceConstants.DISABLE_STATUS.equals(spacePost.getStatus())){
-            throw new NotFoundException("帖子不存在或已被删除");
+        if (spacePost == null || SpaceConstants.DISABLE_STATUS.equals(spacePost.getStatus())) {
+            throw new SpaceException(ErrorCode.POST_NOT_FOUND, "帖子不存在或已被删除");
         }
 
         SpaceComment spaceComment = SpaceComment.builder()
@@ -51,11 +51,11 @@ public class SpaceCommentServiceImpl implements SpaceCommentService {
     @Override
     public void delete(Long commentId) {
         SpaceComment spaceComment = spaceCommentMapper.selectById(commentId);
-        if(spaceComment == null || SpaceConstants.DISABLE_STATUS.equals(spaceComment.getStatus())){
-            throw new NotFoundException("评论不存在或已被删除");
+        if (spaceComment == null || SpaceConstants.DISABLE_STATUS.equals(spaceComment.getStatus())) {
+            throw new SpaceException(ErrorCode.COMMENT_NOT_FOUND, "评论不存在或已被删除");
         }
-        if(!spaceComment.getPublishId().equals(UserContext.getCurUserId())){
-            throw new ForbiddenException("非评论发布人，不能删除");
+        if (!spaceComment.getPublishId().equals(UserContext.getCurUserId())) {
+            throw new SpaceException(ErrorCode.POST_PERMISSION_DENIED, "非评论发布人，不能删除");
         }
         spaceComment.setStatus(SpaceConstants.DISABLE_STATUS);
         spaceCommentMapper.updateDisableStatusById(spaceComment);

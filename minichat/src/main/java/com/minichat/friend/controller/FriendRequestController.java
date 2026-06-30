@@ -1,12 +1,13 @@
 package com.minichat.friend.controller;
 
+import com.minichat.common.exception.AuthException;
+import com.minichat.common.result.Result;
+import com.minichat.common.util.UserContext;
 import com.minichat.friend.dto.FriendRequestDTO;
 import com.minichat.friend.dto.HandleFriendRequestDTO;
+import com.minichat.friend.service.FriendRequestService;
 import com.minichat.friend.vo.FriendRequestVO;
 import com.minichat.friend.vo.SentFriendRequestVO;
-import com.minichat.common.result.Result;
-import com.minichat.friend.service.FriendRequestService;
-import com.minichat.common.util.UserContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,7 @@ public class FriendRequestController {
     public Result<String> sendFriendRequest(@Valid @RequestBody FriendRequestDTO friendRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if(currentUserId == null){
-            return Result.error("用户未登录");
+            throw new AuthException("用户未登录");
         }
         String msg = friendRequestService.sendFriendRequest(friendRequestDTO);
         return Result.success(msg);
@@ -41,7 +42,7 @@ public class FriendRequestController {
     public Result<String> handleFriendRequest(@Valid @RequestBody HandleFriendRequestDTO handleFriendRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         if(currentUserId == null){
-            return Result.error("用户未登录");
+            throw new AuthException("用户未登录");
         }
         friendRequestService.handleFriendRequest(handleFriendRequestDTO);
         return Result.success("处理成功");

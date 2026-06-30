@@ -1,23 +1,26 @@
 package com.minichat.group.service.impl;
 
-
 import com.alibaba.fastjson2.TypeReference;
+import com.minichat.common.constants.GroupConstants;
 import com.minichat.common.constants.RedisConstants;
-import com.minichat.common.exception.ForbiddenException;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.common.exception.ValidationException;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.GroupException;
+import com.minichat.common.util.OssFileUtil;
+import com.minichat.common.util.UserContext;
+import com.minichat.group.dto.CreateGroupDTO;
+import com.minichat.group.dto.GroupMemberAddDTO;
+import com.minichat.group.dto.GroupMemberRemoveDTO;
+import com.minichat.group.dto.GroupMemberRoleUpdateDTO;
+import com.minichat.group.dto.GroupTransferDTO;
+import com.minichat.group.dto.GroupUpdateDTO;
+import com.minichat.group.entity.ChatGroup;
+import com.minichat.group.entity.GroupMember;
+import com.minichat.group.service.GroupService;
 import com.minichat.group.vo.GroupMemberVO;
 import com.minichat.group.vo.GroupSearchVO;
 import com.minichat.group.vo.GroupVO;
-import com.minichat.common.constants.GroupConstants;
-import com.minichat.group.entity.ChatGroup;
-import com.minichat.group.entity.GroupMember;
-import com.minichat.group.dto.*;
 import com.minichat.chat.mapper.GroupMessageMapper;
 import com.minichat.user.mapper.UserMapper;
-import com.minichat.group.service.GroupService;
-import com.minichat.common.util.OssFileUtil;
-import com.minichat.common.util.UserContext;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,16 +56,16 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
         List<Long> memberIds = createGroupDTO.getMemberIds();
         List<String> keys = new ArrayList<>();
-        if(memberIds == null){
+        if (memberIds == null) {
             memberIds = new ArrayList<>();
         }
-        if(!memberIds.contains(userId)) {
+        if (!memberIds.contains(userId)) {
             memberIds.add(0, userId);
         }
         int memberCount = memberIds.size();
 
         Integer maxMembers = createGroupDTO.getMaxMembers();
-        if(maxMembers == null){
+        if (maxMembers == null) {
             maxMembers = GroupConstants.DEFAULT_MAX_MEMBERS;
         }
 
@@ -85,7 +88,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
         for (Long memberId : memberIds) {
             int role = GroupConstants.ROLE_MEMBER;
-            if(memberId.equals(userId)){
+            if (memberId.equals(userId)) {
                 role = GroupConstants.ROLE_GROUPOWNER;
             }
 
@@ -130,7 +133,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
                 new TypeReference<List<GroupVO>>() {},
                 id -> {
                     List<GroupVO> list = groupMemberMapper.selectGroupVOByUserId(id);
-                    for(GroupVO groupVO : list){
+                    for (GroupVO groupVO : list) {
                         List<Long> adminIds = groupMemberMapper.selectAdminIdsByGroupId(groupVO.getId());
                         groupVO.setAdminIds(adminIds);
                     }
@@ -156,7 +159,6 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
                 },
                 RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
 
-
         return groupVO;
     }
 
@@ -164,19 +166,19 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
     public String uploadGroupAvatar(Long groupId, MultipartFile avatar) {
         Long currentUserId = UserContext.getCurUserId();
         ChatGroup group = chatGroupMapper.selectById(groupId);
-        if(group == null){
-            throw new NotFoundException("群组不存在或已被删除");
+        if (group == null) {
+            throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "群组不存在或已被删除");
         }
 
         Integer userRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, currentUserId);
         boolean isAdmin = Objects.equals(userRole, GroupConstants.ROLE_ADMIN);
         boolean isOwner = group.getOwnerId().equals(currentUserId);
-        if(!isAdmin && !isOwner){
-            throw new ForbiddenException("只有群组所有者或管理员才能上传群组头像");
+        if (!isAdmin && !isOwner) {
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "只有群组所有者或管理员才能上传群组头像");
         }
 
-        if(avatar == null || avatar.isEmpty()){
-            throw new ValidationException("群组头像不能为空");
+        if (avatar == null || avatar.isEmpty()) {
+            throw new GroupException(ErrorCode.BAD_REQUEST, "群组头像不能为空");
         }
 
         String newAvatarUrl = null;
@@ -194,7 +196,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
             log.info("群组{}新头像上传OSS成功，URL：{}", groupId, newAvatarUrl);
         } catch (IOException e) {
             log.error("群组{}头像文件流异常", groupId, e);
-            throw new com.minichat.common.exception.SystemException("头像上传失败：文件流异常");
+            throw new GroupException(ErrorCode.INTERNAL_ERROR, "头像上传失败：文件流异常");
         }
 
         chatGroupMapper.updateAvatar(groupId, newAvatarUrl);
@@ -216,7 +218,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
         ChatGroup group = chatGroupMapper.selectById(groupId);
         if (group == null) {
-            throw new NotFoundException("群组不存在");
+            throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "群组不存在");
         }
 
         List<Long> existingMemberIds = groupMemberMapper.selectMemberIdsByGroupId(groupId);
@@ -228,22 +230,22 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         }
 
         if (newMemberIds.isEmpty()) {
-            throw new ValidationException("所选用户均已在群中");
+            throw new GroupException(ErrorCode.GROUP_ALREADY_IN, "所选用户均已在群中");
         }
 
         Integer invitePolicy = group.getInvitePolicy();
         Integer role = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, currentUserId);
 
         if (role == null) {
-            throw new ForbiddenException("您不是该群成员，无法邀请");
+            throw new GroupException(ErrorCode.NOT_GROUP_MEMBER, "您不是该群成员，无法邀请");
         }
 
-        if(role < invitePolicy){
-            throw new ForbiddenException("您的权限不足，无法邀请该群成员");
+        if (role < invitePolicy) {
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "您的权限不足，无法邀请该群成员");
         }
 
         if (existingMemberIds.size() + newMemberIds.size() > group.getMaxMembers()) {
-            throw new ValidationException("群成员数量已达上限，无法继续邀请");
+            throw new GroupException(ErrorCode.GROUP_FULL, "群成员数量已达上限，无法继续邀请");
         }
 
         for (Long newMemberId : newMemberIds) {
@@ -271,22 +273,22 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         Long currentUserId = UserContext.getCurUserId();
         Integer role = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupMemberRemoveDTO.getGroupId(), currentUserId);
 
-        if(role == null){
-            throw new ForbiddenException("您不是该群成员，无法删除");
+        if (role == null) {
+            throw new GroupException(ErrorCode.NOT_GROUP_MEMBER, "您不是该群成员，无法删除");
         }
 
-        if(role < GroupConstants.ROLE_ADMIN){
-            throw new ForbiddenException("您的权限不足，无法删除该群成员");
+        if (role < GroupConstants.ROLE_ADMIN) {
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "您的权限不足，无法删除该群成员");
         }
 
         Integer targetRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupMemberRemoveDTO.getGroupId(), groupMemberRemoveDTO.getUserId());
 
-        if(targetRole == null){
-            throw new NotFoundException("该群成员不存在");
+        if (targetRole == null) {
+            throw new GroupException(ErrorCode.NOT_GROUP_MEMBER, "该群成员不存在");
         }
 
-        if(targetRole >= role){
-            throw new ForbiddenException("您的权限不足，无法删除该群成员");
+        if (targetRole >= role) {
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "您的权限不足，无法删除该群成员");
         }
 
         groupMemberMapper.deleteByGroupIdAndUserId(groupMemberRemoveDTO.getGroupId(), groupMemberRemoveDTO.getUserId());
@@ -302,19 +304,19 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
     @Transactional
     public void exitGroup(Long groupId, Long curUserId) {
         Integer userRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, curUserId);
-        if(userRole == null){
-            throw new ForbiddenException("您不是该群成员，无法退出");
+        if (userRole == null) {
+            throw new GroupException(ErrorCode.NOT_GROUP_MEMBER, "您不是该群成员，无法退出");
         }
 
-        if(userRole.equals(GroupConstants.ROLE_GROUPOWNER)){
+        if (userRole.equals(GroupConstants.ROLE_GROUPOWNER)) {
             int memberCount = groupMemberMapper.selectMemberIdsByGroupId(groupId).size();
-            if(memberCount == 1){
+            if (memberCount == 1) {
                 groupMessageMapper.deleteByGroupId(groupId);
                 groupMemberMapper.deleteByGroupIdAndUserId(groupId, curUserId);
                 chatGroupMapper.deleteById(groupId);
                 return;
-            }else{
-                throw new ForbiddenException("群主不能退出群聊，请先转让群主");
+            } else {
+                throw new GroupException(ErrorCode.GROUP_OWNER_CANNOT_EXIT, "群主不能退出群聊，请先转让群主");
             }
         }
 
@@ -333,25 +335,25 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
         Integer currentUserRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, currentUserId);
         if (currentUserRole == null || !currentUserRole.equals(GroupConstants.ROLE_GROUPOWNER)) {
-            throw new ForbiddenException("只有群主可以设置或取消管理员");
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "只有群主可以设置或取消管理员");
         }
 
         Long targetUserId = groupMemberRoleUpdateDTO.getUserId();
         if (currentUserId.equals(targetUserId)) {
-            throw new ValidationException("群主不能修改自己的角色，请使用转让群主功能");
+            throw new GroupException(ErrorCode.BAD_REQUEST, "群主不能修改自己的角色，请使用转让群主功能");
         }
 
         Integer targetUserRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, targetUserId);
         if (targetUserRole == null) {
-            throw new NotFoundException("该用户不是群成员");
+            throw new GroupException(ErrorCode.NOT_GROUP_MEMBER, "该用户不是群成员");
         }
 
         if (targetUserRole.equals(GroupConstants.ROLE_GROUPOWNER)) {
-            throw new ForbiddenException("不能修改群主的角色");
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "不能修改群主的角色");
         }
 
         if (!newRole.equals(GroupConstants.ROLE_ADMIN) && !newRole.equals(GroupConstants.ROLE_MEMBER)) {
-            throw new ValidationException("只能设置管理员或普通成员身份");
+            throw new GroupException(ErrorCode.BAD_REQUEST, "只能设置管理员或普通成员身份");
         }
 
         groupMemberMapper.updateRole(groupId, targetUserId, newRole);
@@ -367,17 +369,17 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         Long groupId = groupTransferDTO.getGroupId();
 
         if (currentUserId.equals(newOwnerId)) {
-            throw new ValidationException("不能转让给自己");
+            throw new GroupException(ErrorCode.BAD_REQUEST, "不能转让给自己");
         }
 
         Integer currentUserRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, currentUserId);
         if (currentUserRole == null || !currentUserRole.equals(GroupConstants.ROLE_GROUPOWNER)) {
-            throw new ForbiddenException("只有群主可以转让群组");
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "只有群主可以转让群组");
         }
 
         Integer newOwnerRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, newOwnerId);
         if (newOwnerRole == null) {
-            throw new NotFoundException("新群主必须是群成员");
+            throw new GroupException(ErrorCode.NOT_GROUP_MEMBER, "新群主必须是群成员");
         }
 
         groupMemberMapper.updateRole(groupId, currentUserId, GroupConstants.ROLE_MEMBER);
@@ -391,13 +393,13 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
     public void dismissGroup(Long groupId) {
         ChatGroup group = chatGroupMapper.selectById(groupId);
         if (group == null) {
-            throw new NotFoundException("群组不存在或已被删除");
+            throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "群组不存在或已被删除");
         }
 
         Long currentUserId = UserContext.getCurUserId();
         Integer currentUserRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, currentUserId);
         if (currentUserRole == null || !currentUserRole.equals(GroupConstants.ROLE_GROUPOWNER)) {
-            throw new ForbiddenException("只有群主可以解散群组");
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "只有群主可以解散群组");
         }
 
         groupMemberMapper.deleteByGroupId(groupId);
@@ -420,8 +422,8 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
     public void updateGroupProfile(Long groupId, GroupUpdateDTO groupUpdateDTO) {
         ChatGroup group = chatGroupMapper.selectById(groupId);
 
-        if(group == null){
-            throw new NotFoundException("群组不存在或已被删除");
+        if (group == null) {
+            throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "群组不存在或已被删除");
         }
 
         Long currentUserId = UserContext.getCurUserId();
@@ -429,12 +431,12 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         Integer userRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(groupId, currentUserId);
         boolean isAdmin = Objects.equals(userRole, GroupConstants.ROLE_ADMIN);
         boolean isOwner = group.getOwnerId().equals(currentUserId);
-        if(!isAdmin && !isOwner){
-            throw new ForbiddenException("只有群组所有者或管理员才能更新群组信息");
+        if (!isAdmin && !isOwner) {
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "只有群组所有者或管理员才能更新群组信息");
         }
 
         group.setGroupName(groupUpdateDTO.getGroupName());
-        if(groupUpdateDTO.getAvatar() != null  && !groupUpdateDTO.getAvatar().trim().isEmpty()){
+        if (groupUpdateDTO.getAvatar() != null && !groupUpdateDTO.getAvatar().trim().isEmpty()) {
             group.setAvatar(groupUpdateDTO.getAvatar());
             log.info("用户{}更新群组{}头像为: {}", currentUserId, groupId, groupUpdateDTO.getAvatar());
         }

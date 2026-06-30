@@ -1,12 +1,14 @@
 package com.minichat.group.controller;
 
+import com.minichat.common.exception.AuthException;
+import com.minichat.common.exception.ValidationException;
+import com.minichat.common.result.Result;
+import com.minichat.common.util.UserContext;
+import com.minichat.group.dto.*;
+import com.minichat.group.service.GroupService;
 import com.minichat.group.vo.GroupMemberVO;
 import com.minichat.group.vo.GroupSearchVO;
 import com.minichat.group.vo.GroupVO;
-import com.minichat.common.result.Result;
-import com.minichat.group.dto.*;
-import com.minichat.group.service.GroupService;
-import com.minichat.common.util.UserContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +33,7 @@ public class GroupController {
     public Result<List<GroupVO>> getGroupList() {
         Long currentUserId = UserContext.getCurUserId();
         if (currentUserId == null) {
-            return Result.error("用户未登录");
+            throw new AuthException("用户未登录");
         }
         List<GroupVO> groupVOList = groupService.getGroupList(currentUserId);
         return Result.success("获取群组列表成功", groupVOList);
@@ -40,13 +42,13 @@ public class GroupController {
     @GetMapping("/profile/{groupId}")
     public Result<GroupVO> getGroupProfile(@PathVariable Long groupId) {
         if (groupId == null) {
-            return Result.error("群组ID不能为空");
+            throw new ValidationException("群组ID不能为空");
         }
 
         GroupVO groupVO = groupService.getGroupProfile(groupId);
 
         if (groupVO == null) {
-            return Result.error("群组不存在");
+            throw new ValidationException("群组不存在");
         }
 
         return Result.success("获取群组详情成功", groupVO);
@@ -55,7 +57,7 @@ public class GroupController {
     @PostMapping("/avatar/{groupId}")
     public Result<String> uploadGroupAvatar(@PathVariable Long groupId, @RequestPart("avatar") MultipartFile avatar){
         if(groupId == null){
-            return Result.error("群组ID不能为空");
+            throw new ValidationException("群组ID不能为空");
         }
 
         String avatarUrl = groupService.uploadGroupAvatar(groupId, avatar);
@@ -66,7 +68,7 @@ public class GroupController {
     @PutMapping("/profile/update/{groupId}")
     public Result<String> updateGroupProfile(@PathVariable Long groupId, @Valid @RequestBody GroupUpdateDTO groupUpdateDTO) {
         if (groupId == null) {
-            return Result.error("群组ID不能为空");
+            throw new ValidationException("群组ID不能为空");
         }
 
         groupService.updateGroupProfile(groupId, groupUpdateDTO);
@@ -76,7 +78,7 @@ public class GroupController {
     @GetMapping("/member/list/{groupId}")
     public Result<List<GroupMemberVO>> getGroupMemberList(@PathVariable Long groupId) {
         if (groupId == null) {
-            return Result.error("群组ID不能为空");
+            throw new ValidationException("群组ID不能为空");
         }
 
         List<GroupMemberVO> groupMemberVOList = groupService.getGroupMemberList(groupId);
@@ -101,7 +103,7 @@ public class GroupController {
     @PostMapping("/exit/{groupId}")
     public Result<String> exitGroup(@PathVariable Long groupId) {
         if (groupId == null) {
-            return Result.error("群组ID不能为空");
+            throw new ValidationException("群组ID不能为空");
         }
 
         groupService.exitGroup(groupId, UserContext.getCurUserId());
@@ -126,7 +128,7 @@ public class GroupController {
     @DeleteMapping("/dismiss/{groupId}")
     public Result<String> dismissGroup(@PathVariable Long groupId) {
         if (groupId == null) {
-            return Result.error("群组ID不能为空");
+            throw new ValidationException("群组ID不能为空");
         }
 
         groupService.dismissGroup(groupId);

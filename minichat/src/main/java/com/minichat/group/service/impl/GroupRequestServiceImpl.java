@@ -1,22 +1,21 @@
 package com.minichat.group.service.impl;
 
-import com.minichat.common.exception.DuplicateException;
-import com.minichat.common.exception.ForbiddenException;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.group.dto.GroupRequestDTO;
-import com.minichat.group.dto.HandleGroupRequestDTO;
-import com.minichat.group.vo.ReceivedGroupRequestVO;
-import com.minichat.group.vo.SentGroupRequestVO;
 import com.minichat.common.constants.GroupConstants;
 import com.minichat.common.constants.RequestConstants;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.GroupException;
+import com.minichat.common.util.UserContext;
+import com.minichat.group.dto.GroupRequestDTO;
+import com.minichat.group.dto.HandleGroupRequestDTO;
 import com.minichat.group.entity.ChatGroup;
 import com.minichat.group.entity.GroupMember;
 import com.minichat.group.entity.GroupRequest;
-import com.minichat.user.entity.User;
 import com.minichat.group.mapper.GroupRequestMapper;
-import com.minichat.user.mapper.UserMapper;
 import com.minichat.group.service.GroupRequestService;
-import com.minichat.common.util.UserContext;
+import com.minichat.group.vo.ReceivedGroupRequestVO;
+import com.minichat.group.vo.SentGroupRequestVO;
+import com.minichat.user.entity.User;
+import com.minichat.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,11 +39,11 @@ public class GroupRequestServiceImpl extends AbstractGroupService implements Gro
         User currentUser = userMapper.selectById(currentUserId);
         ChatGroup chatGroup = chatGroupMapper.selectById(groupRequestDTO.getGroupId());
         if (chatGroup == null) {
-            throw new NotFoundException("群聊不存在");
+            throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "群聊不存在");
         }
         Integer joinPolicy = chatGroup.getJoinPolicy();
 
-        if(GroupConstants.JOIN_POLICY_FREEDOM.equals(joinPolicy)){
+        if (GroupConstants.JOIN_POLICY_FREEDOM.equals(joinPolicy)) {
             GroupMember groupMember = GroupMember.builder()
                     .groupId(groupRequestDTO.getGroupId())
                     .userId(currentUserId)
@@ -58,24 +57,24 @@ public class GroupRequestServiceImpl extends AbstractGroupService implements Gro
             addGroupMemberAndRefreshCache(groupMember);
 
             return "已加入群聊";
-        }else if(GroupConstants.JOIN_POLICY_INVITE.equals(joinPolicy)){
-            throw new ForbiddenException("加入方式为邀请加入,请让你的好友邀请您加入群聊");
+        } else if (GroupConstants.JOIN_POLICY_INVITE.equals(joinPolicy)) {
+            throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "加入方式为邀请加入,请让你的好友邀请您加入群聊");
         }
 
         int isInGroup = groupMemberMapper.selectByGroupIdAndUserId(groupRequestDTO.getGroupId(), currentUserId);
         if (isInGroup > 0) {
-            throw new DuplicateException("您已经在该群中");
+            throw new GroupException(ErrorCode.GROUP_ALREADY_IN, "您已经在该群中");
         }
 
         GroupRequest groupRequest = groupRequestMapper.selectByGroupIdAndUserId(groupRequestDTO.getGroupId(), currentUserId);
         if (groupRequest != null && RequestConstants.PROCESSING.equals(groupRequest.getStatus())) {
-            throw new DuplicateException("您已经发送过加入该群的请求,请等待处理");
-        }else if(groupRequest != null && RequestConstants.REJECTED.equals(groupRequest.getStatus())){
+            throw new GroupException(ErrorCode.GROUP_ALREADY_IN, "您已经发送过加入该群的请求,请等待处理");
+        } else if (groupRequest != null && RequestConstants.REJECTED.equals(groupRequest.getStatus())) {
 
             groupRequest.setStatus(RequestConstants.PROCESSING);
             groupRequest.setMessage(groupRequestDTO.getMessage());
             groupRequestMapper.update(groupRequest);
-            return "您之前加入该群的请求已被拒绝,以重新发送申请";
+            return "您之前加入该群的请求已被拒绝,已重新发送申请";
         }
 
         GroupRequest newGroupRequest = GroupRequest.builder()
@@ -108,20 +107,20 @@ public class GroupRequestServiceImpl extends AbstractGroupService implements Gro
     public void handleGroupRequest(HandleGroupRequestDTO handleGroupRequestDTO) {
         Long currentUserId = UserContext.getCurUserId();
         ChatGroup chatGroup = chatGroupMapper.selectById(handleGroupRequestDTO.getGroupId());
-        if(chatGroup == null){
-            throw new NotFoundException("群聊不存在");
+        if (chatGroup == null) {
+            throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "群聊不存在");
         }
 
         Integer joinPolicy = chatGroup.getJoinPolicy();
         Integer curUserRole = groupMemberMapper.selectGroupMemberRoleByGroupIdAndUserId(handleGroupRequestDTO.getGroupId(), currentUserId);
 
-        if(GroupConstants.JOIN_POLICY_APPROVAL.equals(joinPolicy)){
-            if(!GroupConstants.ROLE_ADMIN.equals(curUserRole) && !GroupConstants.ROLE_GROUPOWNER.equals(curUserRole)){
-                throw new ForbiddenException("您没有权限处理该请求");
+        if (GroupConstants.JOIN_POLICY_APPROVAL.equals(joinPolicy)) {
+            if (!GroupConstants.ROLE_ADMIN.equals(curUserRole) && !GroupConstants.ROLE_GROUPOWNER.equals(curUserRole)) {
+                throw new GroupException(ErrorCode.GROUP_PERMISSION_DENIED, "您没有权限处理该请求");
             }
             GroupRequest groupRequest = groupRequestMapper.selectByGroupIdAndUserId(handleGroupRequestDTO.getGroupId(), handleGroupRequestDTO.getApplicantId());
-            if(groupRequest == null){
-                throw new NotFoundException("加入群聊请求不存在");
+            if (groupRequest == null) {
+                throw new GroupException(ErrorCode.GROUP_NOT_FOUND, "加入群聊请求不存在");
             }
             groupRequest.setStatus(handleGroupRequestDTO.getStatus());
             groupRequest.setProcessedTime(LocalDateTime.now());

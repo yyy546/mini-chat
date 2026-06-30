@@ -5,30 +5,23 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.minichat.chat.dto.GroupMessageDTO;
 import com.minichat.chat.dto.GroupMessageMQDTO;
 import com.minichat.chat.dto.RecallMessageDTO;
+import com.minichat.chat.entity.GroupMessage;
+import com.minichat.chat.mapper.GroupMessageMapper;
+import com.minichat.chat.service.GroupMessageService;
 import com.minichat.chat.vo.FileVO;
 import com.minichat.chat.vo.GroupMessageVO;
-import com.minichat.chat.entity.GroupMessage;
 import com.minichat.common.constants.MessageConstants;
+import com.minichat.common.constants.MqConstants;
 import com.minichat.common.constants.OssConstants;
 import com.minichat.common.constants.RedisConstants;
-import com.minichat.common.exception.BusinessException;
-import com.minichat.common.exception.ForbiddenException;
-import com.minichat.common.exception.MessageException;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.common.exception.ValidationException;
-import com.minichat.chat.service.GroupMessageService;
-
-import java.security.Principal;
-
-
-import com.minichat.common.constants.MqConstants;
+import com.minichat.common.exception.ChatException;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.util.UserContext;
 import com.minichat.group.entity.ChatGroup;
 import com.minichat.group.mapper.ChatGroupMapper;
 import com.minichat.group.mapper.GroupMemberMapper;
-import com.minichat.chat.mapper.GroupMessageMapper;
-import com.minichat.user.mapper.UserMapper;
-import com.minichat.common.util.UserContext;
 import com.minichat.user.entity.User;
+import com.minichat.user.mapper.UserMapper;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,9 +30,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-
 import java.util.Objects;
 
 @Slf4j
@@ -55,100 +48,89 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
     private final RabbitTemplate rabbitTemplate;
 
     @Override
-    public String sendGroupMessage(GroupMessageDTO groupMessageDTO, Principal principal) {
-        try {
-            Long realSenderId = Long.parseLong(principal.getName());
-            groupMessageDTO.setSenderId(realSenderId);
+    public void sendGroupMessage(GroupMessageDTO groupMessageDTO, Principal principal) {
+        Long realSenderId = Long.parseLong(principal.getName());
+        groupMessageDTO.setSenderId(realSenderId);
 
-            if (groupMessageDTO.getMessageType() == 1) {
-                if (StringUtils.isEmpty(groupMessageDTO.getContent()) || groupMessageDTO.getContent().length() > 2000) {
-                    throw new ValidationException("文本消息内容为空或超过2000字");
-                }
-            } else {
-                String fileUrl = groupMessageDTO.getFileUrl();
-                String fileName = groupMessageDTO.getFileName();
-                Long fileSize = groupMessageDTO.getFileSize();
-                boolean valid = validateFile(fileUrl, fileName, fileSize);
-                if(!valid){
-                    throw new ValidationException("文件信息不合法");
-                }
+        if (groupMessageDTO.getMessageType() == 1) {
+            if (StringUtils.isEmpty(groupMessageDTO.getContent()) || groupMessageDTO.getContent().length() > 2000) {
+                throw new ChatException(ErrorCode.MESSAGE_TOO_LONG, "文本消息内容为空或超过2000字");
             }
-
-            User sender = userMapper.selectById(realSenderId);
-            ChatGroup group = chatGroupMapper.selectById(groupMessageDTO.getGroupId());
-
-            if (sender == null) {
-                throw new NotFoundException("发送方不存在");
+        } else {
+            String fileUrl = groupMessageDTO.getFileUrl();
+            String fileName = groupMessageDTO.getFileName();
+            Long fileSize = groupMessageDTO.getFileSize();
+            if (!validateFile(fileUrl, fileName, fileSize)) {
+                throw new ChatException(ErrorCode.MESSAGE_FILE_INVALID, "文件信息不合法");
             }
-            if (group == null) {
-                throw new NotFoundException("群聊不存在");
-            }
-
-            int groupMemberCount = groupMemberMapper.selectByGroupIdAndUserId(groupMessageDTO.getGroupId(), realSenderId);
-
-            if(groupMemberCount == 0){
-                throw new ForbiddenException("用户不在群聊中或已被禁言，无法发送消息");
-            }
-
-            String content = groupMessageDTO.getContent();
-            if (groupMessageDTO.getMessageType() != 1 && StringUtils.isEmpty(content)) {
-                content = groupMessageDTO.getMessageType() == 2 ? "[图片]" : "[文件]";
-            }
-
-            Long groupId = groupMessageDTO.getGroupId();
-            Long messageSeq = redisTemplate.opsForValue().
-                    increment(RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + groupId, 1);
-
-            GroupMessage groupMessage = GroupMessage.builder()
-                    .messageSeq(messageSeq)
-                    .groupId(groupMessageDTO.getGroupId())
-                    .senderId(realSenderId)
-                    .messageType(groupMessageDTO.getMessageType())
-                    .content(content)
-                    .fileUrl(groupMessageDTO.getFileUrl())
-                    .fileName(groupMessageDTO.getFileName())
-                    .fileSize(groupMessageDTO.getFileSize())
-                    .isRecall(MessageConstants.NOT_RECALL)
-                    .sendTime(LocalDateTime.now())
-                    .build();
-
-            groupMessageMapper.insert(groupMessage);
-            Long messageId = groupMessage.getId();
-            log.info("群聊消息保存到数据库成功，messageId：{}", messageId);
-
-            GroupMessageMQDTO groupMessageMQDTO = GroupMessageMQDTO.builder()
-                    .messageId(messageId)
-                    .messageSeq(messageSeq)
-                    .groupId(groupId)
-                    .senderId(realSenderId)
-                    .senderNickname(sender.getNickname())
-                    .senderAvatar(sender.getAvatar())
-                    .messageType(groupMessageDTO.getMessageType())
-                    .content(content)
-                    .fileUrl(groupMessageDTO.getFileUrl())
-                    .fileName(groupMessageDTO.getFileName())
-                    .fileSize(groupMessageDTO.getFileSize())
-                    .tempId(groupMessageDTO.getTempId())
-                    .sendTime(LocalDateTime.now())
-                    .build();
-
-            rabbitTemplate.convertAndSend(MqConstants.GROUP_EXCHANGE,
-                    MqConstants.GROUP_ROUTING_KEY,
-                    groupMessageMQDTO);
-
-            log.info("群聊消息已发送到MQ队列，tempId: {}, 发送方ID: {}, 接收方ID: {}",
-                    groupMessageDTO.getTempId(),
-                    realSenderId,
-                    groupMessageDTO.getGroupId());
-
-            return "消息发送成功";
-
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e){
-            log.error("发送群聊消息异常", e);
-            throw new MessageException("发送群聊消息失败");
         }
+
+        User sender = userMapper.selectById(realSenderId);
+        ChatGroup group = chatGroupMapper.selectById(groupMessageDTO.getGroupId());
+
+        if (sender == null) {
+            throw new ChatException(ErrorCode.BAD_REQUEST, "发送方不存在");
+        }
+        if (group == null) {
+            throw new ChatException(ErrorCode.GROUP_NOT_FOUND, "群聊不存在");
+        }
+
+        int groupMemberCount = groupMemberMapper.selectByGroupIdAndUserId(groupMessageDTO.getGroupId(), realSenderId);
+
+        if (groupMemberCount == 0) {
+            throw new ChatException(ErrorCode.NOT_GROUP_MEMBER, "用户不在群聊中或已被禁言，无法发送消息");
+        }
+
+        String content = groupMessageDTO.getContent();
+        if (groupMessageDTO.getMessageType() != 1 && StringUtils.isEmpty(content)) {
+            content = groupMessageDTO.getMessageType() == 2 ? "[图片]" : "[文件]";
+        }
+
+        Long groupId = groupMessageDTO.getGroupId();
+        Long messageSeq = redisTemplate.opsForValue()
+                .increment(RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + groupId, 1);
+
+        GroupMessage groupMessage = GroupMessage.builder()
+                .messageSeq(messageSeq)
+                .groupId(groupMessageDTO.getGroupId())
+                .senderId(realSenderId)
+                .messageType(groupMessageDTO.getMessageType())
+                .content(content)
+                .fileUrl(groupMessageDTO.getFileUrl())
+                .fileName(groupMessageDTO.getFileName())
+                .fileSize(groupMessageDTO.getFileSize())
+                .isRecall(MessageConstants.NOT_RECALL)
+                .sendTime(LocalDateTime.now())
+                .build();
+
+        groupMessageMapper.insert(groupMessage);
+        Long messageId = groupMessage.getId();
+        log.info("群聊消息保存到数据库成功，messageId：{}", messageId);
+
+        GroupMessageMQDTO groupMessageMQDTO = GroupMessageMQDTO.builder()
+                .messageId(messageId)
+                .messageSeq(messageSeq)
+                .groupId(groupId)
+                .senderId(realSenderId)
+                .senderNickname(sender.getNickname())
+                .senderAvatar(sender.getAvatar())
+                .messageType(groupMessageDTO.getMessageType())
+                .content(content)
+                .fileUrl(groupMessageDTO.getFileUrl())
+                .fileName(groupMessageDTO.getFileName())
+                .fileSize(groupMessageDTO.getFileSize())
+                .tempId(groupMessageDTO.getTempId())
+                .sendTime(LocalDateTime.now())
+                .build();
+
+        rabbitTemplate.convertAndSend(MqConstants.GROUP_EXCHANGE,
+                MqConstants.GROUP_ROUTING_KEY,
+                groupMessageMQDTO);
+
+        log.info("群聊消息已发送到MQ队列，tempId: {}, 发送方ID: {}, 接收方ID: {}",
+                groupMessageDTO.getTempId(),
+                realSenderId,
+                groupMessageDTO.getGroupId());
     }
 
     @Override
@@ -170,10 +152,10 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
     @Override
     public FileVO uploadGroupFile(MultipartFile file, Integer type) {
         if (!(MessageConstants.IMAGE.equals(type) || MessageConstants.FILE.equals(type))) {
-            throw new ValidationException("文件类型不合法（2=图片，3=文件）");
+            throw new ChatException(ErrorCode.MESSAGE_FILE_INVALID, "文件类型不合法（2=图片，3=文件）");
         }
         if (file.isEmpty()) {
-            throw new ValidationException("上传文件不能为空");
+            throw new ChatException(ErrorCode.BAD_REQUEST, "上传文件不能为空");
         }
 
         return uploadFileCommon(file, OssConstants.GROUP_IMAGE_PATH, OssConstants.GROUP_FILE_PATH);
@@ -197,13 +179,13 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
     public void recallGroupMessage(Long groupId, Long messageId) {
         GroupMessage groupMessage = groupMessageMapper.selectById(messageId);
         if (groupMessage == null) {
-            throw new NotFoundException("消息不存在");
+            throw new ChatException(ErrorCode.MESSAGE_NOT_FOUND, "消息不存在");
         }
 
         Long senderId = groupMessage.getSenderId();
         Long currentUserId = UserContext.getCurUserId();
         if (!senderId.equals(currentUserId)) {
-            throw new ForbiddenException("只有发送者才能撤回消息");
+            throw new ChatException(ErrorCode.FORBIDDEN, "只有发送者才能撤回消息");
         }
 
         LocalDateTime sendTime = groupMessage.getSendTime();
@@ -216,7 +198,7 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
         });
 
         if (!isRecallSuccess) {
-            throw new ValidationException("消息已发送超过撤回时间限制，无法撤回");
+            throw new ChatException(ErrorCode.MESSAGE_RECALL_TIMEOUT, "消息已发送超过撤回时间限制，无法撤回");
         }
 
         RecallMessageDTO recallMessageDTO = RecallMessageDTO.builder()

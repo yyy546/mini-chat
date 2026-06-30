@@ -1,7 +1,15 @@
 package com.minichat.common.exception;
 
 public class DuplicateException extends BusinessException {
+    public DuplicateException(ErrorCode errorCode) {
+        super(errorCode);
+    }
+
+    public DuplicateException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
+
     public DuplicateException(String message) {
-        super(409, message);
+        super(ErrorCode.CONFLICT, message);
     }
 }

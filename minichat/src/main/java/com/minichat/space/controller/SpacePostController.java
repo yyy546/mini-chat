@@ -1,5 +1,6 @@
 package com.minichat.space.controller;
 
+import com.minichat.common.exception.ValidationException;
 import com.minichat.common.result.Result;
 import com.minichat.space.dto.PublishSpacePostDTO;
 import com.minichat.space.service.SpacePostService;
@@ -33,7 +34,7 @@ public class SpacePostController {
     @GetMapping("/list")
     public Result<List<SpacePostVO>> list(@RequestParam Long userId, @RequestParam Long friendId) {
         if(userId == null || friendId == null){
-            return Result.error("用户ID或好友ID不能为空");
+            throw new ValidationException("用户ID或好友ID不能为空");
         }
         List<SpacePostVO> list = spacePostService.list(userId, friendId);
         return Result.success(list);
@@ -54,7 +55,7 @@ public class SpacePostController {
     @GetMapping("/deleted/list")
     public Result<List<SpacePostVO>> deletedList(@RequestParam Long userId) {
         if(userId == null){
-            return Result.error("用户ID不能为空");
+            throw new ValidationException("用户ID不能为空");
         }
         List<SpacePostVO> list = spacePostService.deletedList(userId);
         return Result.success(list);
@@ -63,7 +64,7 @@ public class SpacePostController {
     @PostMapping("/change/like")
     public Result<String> changeLikeStatus(@RequestParam Long postId){
         if(postId == null){
-            return Result.error("帖子ID不能为空");
+            throw new ValidationException("帖子ID不能为空");
         }
         spacePostService.changeLikeStatus(postId);
         return Result.success("操作成功");

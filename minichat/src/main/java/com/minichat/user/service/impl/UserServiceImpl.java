@@ -1,28 +1,26 @@
 package com.minichat.user.service.impl;
 
 import com.alibaba.fastjson2.TypeReference;
+import com.minichat.common.constants.OssConstants;
 import com.minichat.common.constants.RedisConstants;
-import com.minichat.common.exception.DuplicateException;
-import com.minichat.common.exception.NotFoundException;
-import com.minichat.common.exception.SystemException;
-import com.minichat.common.exception.ValidationException;
+import com.minichat.common.constants.UserConstants;
+import com.minichat.common.enums.GenderEnum;
+import com.minichat.common.exception.ErrorCode;
+import com.minichat.common.exception.UserException;
 import com.minichat.common.util.CacheClient;
+import com.minichat.common.util.JwtUtil;
+import com.minichat.common.util.OssFileUtil;
+import com.minichat.friend.mapper.FriendMapper;
+import com.minichat.user.dto.LoginDTO;
+import com.minichat.user.dto.RegisterDTO;
 import com.minichat.user.dto.UserUpdateDTO;
+import com.minichat.user.entity.User;
+import com.minichat.user.mapper.UserMapper;
 import com.minichat.user.service.LoginAsyncService;
+import com.minichat.user.service.UserService;
 import com.minichat.user.vo.UserDetailVO;
 import com.minichat.user.vo.UserLoginVO;
 import com.minichat.user.vo.UserSearchVO;
-import com.minichat.user.dto.LoginDTO;
-import com.minichat.user.dto.RegisterDTO;
-import com.minichat.common.constants.OssConstants;
-import com.minichat.common.constants.UserConstants;
-import com.minichat.user.entity.User;
-import com.minichat.common.enums.GenderEnum;
-import com.minichat.user.mapper.UserMapper;
-import com.minichat.friend.mapper.FriendMapper;
-import com.minichat.user.service.UserService;
-import com.minichat.common.util.JwtUtil;
-import com.minichat.common.util.OssFileUtil;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,13 +64,13 @@ public class UserServiceImpl implements UserService {
         String username = registerDTO.getUsername();
         RLock lock = redissonClient.getLock(RedisConstants.LOCK_REGISTER_KEY_PREFIX + username);
         try {
-            if(!lock.tryLock(5, TimeUnit.SECONDS)) {
-                throw new SystemException("注册过于频繁，请稍后重试");
+            if (!lock.tryLock(5, TimeUnit.SECONDS)) {
+                throw new UserException(ErrorCode.INTERNAL_ERROR, "注册过于频繁，请稍后重试");
             }
 
             User existingUser = userMapper.selectByUsername(username);
-            if(existingUser != null) {
-                throw new DuplicateException("用户名已存在");
+            if (existingUser != null) {
+                throw new UserException(ErrorCode.USER_ALREADY_EXISTS, "用户名已存在");
             }
             User user = User.builder()
                     .username(registerDTO.getUsername())
@@ -88,12 +86,12 @@ public class UserServiceImpl implements UserService {
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new SystemException("注册失败，请稍后重试");
-        }catch (DuplicateKeyException e){
-            log.warn("用户名重复注册，用户名：{}", registerDTO.getUsername(),e);
-            throw new DuplicateException("用户名已存在");
-        }finally {
-            if(lock.isHeldByCurrentThread()) {
+            throw new UserException(ErrorCode.INTERNAL_ERROR, "注册失败，请稍后重试");
+        } catch (DuplicateKeyException e) {
+            log.warn("用户名重复注册，用户名：{}", registerDTO.getUsername(), e);
+            throw new UserException(ErrorCode.USER_ALREADY_EXISTS, "用户名已存在");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
         }
@@ -103,14 +101,14 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserLoginVO login(LoginDTO loginDTO) {
         User user = userMapper.selectByUsername(loginDTO.getUsername());
-        if(Objects.isNull(user)) {
-            throw new NotFoundException("用户名不存在");
+        if (Objects.isNull(user)) {
+            throw new UserException(ErrorCode.USER_NOT_FOUND, "用户名不存在");
         }
-        if(!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
-            throw new ValidationException("密码错误");
+        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
+            throw new UserException(ErrorCode.USER_PASSWORD_ERROR, "密码错误");
         }
-        if(UserConstants.DISABLE_STATUS.equals(user.getStatus())) {
-            throw new com.minichat.common.exception.ForbiddenException("用户已被禁用");
+        if (UserConstants.DISABLE_STATUS.equals(user.getStatus())) {
+            throw new UserException(ErrorCode.USER_DISABLED, "用户已被禁用");
         }
         Long userId = user.getId();
         loginAsyncService.asyncUpdateLastLoginTime(userId);
@@ -130,8 +128,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserLoginVO me(String username) {
         User user = userMapper.selectByUsername(username);
-        if(Objects.isNull(user)){
-            throw new NotFoundException("用户不存在或已被删除");
+        if (Objects.isNull(user)) {
+            throw new UserException(ErrorCode.USER_NOT_FOUND, "用户不存在或已被删除");
         }
         UserLoginVO userLoginVO = new UserLoginVO();
         BeanUtils.copyProperties(user, userLoginVO);
@@ -148,8 +146,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserLoginVO getUserLoginVO(Long userId) {
         User user = userMapper.selectById(userId);
-        if(Objects.isNull(user)){
-            throw new NotFoundException("用户不存在或已被删除");
+        if (Objects.isNull(user)) {
+            throw new UserException(ErrorCode.USER_NOT_FOUND, "用户不存在或已被删除");
         }
         UserLoginVO userLoginVO = new UserLoginVO();
         BeanUtils.copyProperties(user, userLoginVO);
@@ -163,8 +161,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserDetailVO getUserDetail(Long currentUserId) {
-        if(currentUserId == null){
-            throw new ValidationException("用户ID不能为空");
+        if (currentUserId == null) {
+            throw new UserException(ErrorCode.BAD_REQUEST, "用户ID不能为空");
         }
 
         UserDetailVO userDetailVO = cacheClient.queryWithPassThrough(RedisConstants.CACHE_USER_DETAIL_KEY, currentUserId, new TypeReference<UserDetailVO>() {},
@@ -188,11 +186,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public String uploadAvatar(Long currentUserId, MultipartFile avatar) {
         if (avatar == null || avatar.isEmpty()) {
-            throw new ValidationException("头像文件不能为空");
+            throw new UserException(ErrorCode.BAD_REQUEST, "头像文件不能为空");
         }
         User user = userMapper.selectById(currentUserId);
         if (user == null) {
-            throw new NotFoundException("用户不存在或已被删除");
+            throw new UserException(ErrorCode.USER_NOT_FOUND, "用户不存在或已被删除");
         }
 
         String newAvatarUrl = null;
@@ -210,7 +208,7 @@ public class UserServiceImpl implements UserService {
             log.info("用户{}新头像上传OSS成功，URL：{}", currentUserId, newAvatarUrl);
         } catch (IOException e) {
             log.error("用户{}头像文件流异常", currentUserId, e);
-            throw new SystemException("头像上传失败：文件流异常");
+            throw new UserException(ErrorCode.INTERNAL_ERROR, "头像上传失败：文件流异常");
         }
 
         userMapper.updateAvatar(currentUserId, newAvatarUrl);
@@ -221,10 +219,10 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserDetailVO updateUserDetail(Long currentUserId, UserUpdateDTO userUpdateDTO){
+    public UserDetailVO updateUserDetail(Long currentUserId, UserUpdateDTO userUpdateDTO) {
         User user = userMapper.selectById(currentUserId);
-        if(user == null){
-            throw new NotFoundException("用户不存在或已被删除");
+        if (user == null) {
+            throw new UserException(ErrorCode.USER_NOT_FOUND, "用户不存在或已被删除");
         }
 
         user.setNickname(userUpdateDTO.getNickname());

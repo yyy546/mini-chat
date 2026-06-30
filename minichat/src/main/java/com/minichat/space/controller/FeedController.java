@@ -19,7 +19,8 @@ public class FeedController {
     // 获取关注用户的动态(滚动加载)
     @GetMapping("/follow")
     public Result<ScrollResult> feed(@RequestParam("lastId") Long maxTimeStamp, @RequestParam(name = "offset", defaultValue = "0") Long offset) {
-        return feedService.feed(maxTimeStamp, offset);
+        ScrollResult scrollResult = feedService.feed(maxTimeStamp, offset);
+        return Result.success(scrollResult);
     }
 
 }
