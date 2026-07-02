@@ -10,10 +10,10 @@ import com.minichat.chat.mapper.GroupMessageMapper;
 import com.minichat.chat.service.GroupMessageService;
 import com.minichat.chat.vo.FileVO;
 import com.minichat.chat.vo.GroupMessageVO;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.MessageConstants;
 import com.minichat.common.constants.MqConstants;
 import com.minichat.common.constants.OssConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.common.exception.ChatException;
 import com.minichat.common.exception.ErrorCode;
 import com.minichat.common.util.UserContext;
@@ -88,7 +88,7 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
 
         Long groupId = groupMessageDTO.getGroupId();
         Long messageSeq = redisTemplate.opsForValue()
-                .increment(RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + groupId, 1);
+                .increment(CacheKeys.groupMessageSeq(groupId), 1);
 
         GroupMessage groupMessage = GroupMessage.builder()
                 .messageSeq(messageSeq)
@@ -165,7 +165,7 @@ public class GroupMessageServiceImpl extends AbstractMessageService implements G
     public void markGroupMessageRead(Long groupId) {
         Long currentUserId = UserContext.getCurUserId();
 
-        Object seqObj = redisTemplate.opsForValue().get(RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + groupId);
+        Object seqObj = redisTemplate.opsForValue().get(CacheKeys.groupMessageSeq(groupId));
         Long messageSeq = seqObj != null ? Long.valueOf(seqObj.toString()) : null;
 
         if (messageSeq == null) {

@@ -1,8 +1,8 @@
 package com.minichat.group.service.impl;
 
 import com.alibaba.fastjson2.TypeReference;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.GroupConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.common.exception.ErrorCode;
 import com.minichat.common.exception.GroupException;
 import com.minichat.common.util.OssFileUtil;
@@ -102,7 +102,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
                     .joinTime(LocalDateTime.now())
                     .build();
             groupMemberMapper.insert(groupMember);
-            keys.add(RedisConstants.CACHE_USER_GROUP_LIST_KEY_PREFIX + memberId);
+            keys.add(CacheKeys.userGroupList(memberId));
         }
         cacheClient.deleteBatch(keys);
 
@@ -129,7 +129,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
     @Override
     public List<GroupVO> getGroupList(Long currentUserId) {
         List<GroupVO> groupVOList = cacheClient.queryWithPassThrough(
-                RedisConstants.CACHE_USER_GROUP_LIST_KEY_PREFIX, currentUserId,
+                CacheKeys.USER_GROUP_LIST_PREFIX, currentUserId,
                 new TypeReference<List<GroupVO>>() {},
                 id -> {
                     List<GroupVO> list = groupMemberMapper.selectGroupVOByUserId(id);
@@ -139,7 +139,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
                     }
                     return list;
                 },
-                RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
+                CacheKeys.EXPIRE_NORMAL + new Random().nextLong(10), TimeUnit.MINUTES);
 
         return groupVOList;
     }
@@ -147,7 +147,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
     @Override
     public GroupVO getGroupProfile(Long groupId) {
         GroupVO groupVO = cacheClient.queryWithPassThrough(
-                RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX, groupId,
+                CacheKeys.GROUP_PROFILE_PREFIX, groupId,
                 new TypeReference<GroupVO>() {},
                 id -> {
                     GroupVO groupVOById = chatGroupMapper.selectGroupVOById(groupId);
@@ -157,7 +157,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
                     return groupVOById;
                 },
-                RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
+                CacheKeys.EXPIRE_NORMAL + new Random().nextLong(10), TimeUnit.MINUTES);
 
         return groupVO;
     }
@@ -265,7 +265,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         chatGroupMapper.updateMemberCount(groupId, existingMemberIds.size() + newMemberIds.size());
         refreshGroupMemberCache(groupId);
 
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupId);
+        cacheClient.delete(CacheKeys.groupProfile(groupId));
     }
 
     @Override
@@ -295,9 +295,9 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         int memberCount = groupMemberMapper.selectMemberIdsByGroupId(groupMemberRemoveDTO.getGroupId()).size();
         chatGroupMapper.updateMemberCount(groupMemberRemoveDTO.getGroupId(), memberCount);
         refreshGroupMemberCache(groupMemberRemoveDTO.getGroupId());
-        String exitUserCacheKey = RedisConstants.CACHE_USER_GROUP_LIST_KEY_PREFIX + groupMemberRemoveDTO.getUserId();
+        String exitUserCacheKey = CacheKeys.userGroupList(groupMemberRemoveDTO.getUserId());
         cacheClient.delete(exitUserCacheKey);
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupMemberRemoveDTO.getGroupId());
+        cacheClient.delete(CacheKeys.groupProfile(groupMemberRemoveDTO.getGroupId()));
     }
 
     @Override
@@ -322,9 +322,9 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
         groupMemberMapper.deleteByGroupIdAndUserId(groupId, curUserId);
         updateMemberCountAndRefreshCache(groupId);
-        String exitUserCacheKey = RedisConstants.CACHE_USER_GROUP_LIST_KEY_PREFIX + curUserId;
+        String exitUserCacheKey = CacheKeys.userGroupList(curUserId);
         cacheClient.delete(exitUserCacheKey);
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupId);
+        cacheClient.delete(CacheKeys.groupProfile(groupId));
     }
 
     @Override
@@ -358,7 +358,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
 
         groupMemberMapper.updateRole(groupId, targetUserId, newRole);
         refreshGroupMemberCache(groupId);
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupId);
+        cacheClient.delete(CacheKeys.groupProfile(groupId));
     }
 
     @Override
@@ -386,7 +386,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         groupMemberMapper.updateRole(groupId, newOwnerId, GroupConstants.ROLE_GROUPOWNER);
         chatGroupMapper.updateOwner(groupId, newOwnerId);
         refreshGroupMemberCache(groupId);
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupId);
+        cacheClient.delete(CacheKeys.groupProfile(groupId));
     }
 
     @Override
@@ -409,7 +409,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         chatGroupMapper.deleteById(groupId);
 
         refreshGroupMemberCache(groupId);
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupId);
+        cacheClient.delete(CacheKeys.groupProfile(groupId));
     }
 
     @Override
@@ -448,7 +448,7 @@ public class GroupServiceImpl extends AbstractGroupService implements GroupServi
         group.setUpdatedTime(LocalDateTime.now());
         chatGroupMapper.update(group);
         refreshGroupMemberCache(groupId);
-        cacheClient.delete(RedisConstants.CACHE_GROUP_PROFILE_KEY_PREFIX + groupId);
+        cacheClient.delete(CacheKeys.groupProfile(groupId));
     }
 
 }

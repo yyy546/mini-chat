@@ -1,6 +1,6 @@
 package com.minichat.group.service.impl;
 
-import com.minichat.common.constants.RedisConstants;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.util.CacheClient;
 import com.minichat.group.mapper.ChatGroupMapper;
 import com.minichat.group.mapper.GroupMemberMapper;
@@ -34,7 +34,7 @@ public abstract class AbstractGroupService {
         List<Long> memberIds = groupMemberMapper.selectMemberIdsByGroupId(groupId);
         List<String> keys = new ArrayList<>();
         for (Long memberId : memberIds) {
-            keys.add(RedisConstants.CACHE_USER_GROUP_LIST_KEY_PREFIX + memberId);
+            keys.add(CacheKeys.userGroupList(memberId));
         }
         cacheClient.deleteBatch(keys);
     }

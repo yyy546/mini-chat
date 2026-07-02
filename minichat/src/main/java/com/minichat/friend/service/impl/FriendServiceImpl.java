@@ -1,8 +1,8 @@
 package com.minichat.friend.service.impl;
 
 import com.alibaba.fastjson2.TypeReference;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.MqConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.common.exception.ErrorCode;
 import com.minichat.common.exception.FriendException;
 import com.minichat.common.util.CacheClient;
@@ -38,10 +38,10 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public List<FriendVO> getFriendList(Long currentUserId) {
-        List<FriendVO> friendVOList = cacheClient.queryWithPassThrough(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX, currentUserId,
+        List<FriendVO> friendVOList = cacheClient.queryWithPassThrough(CacheKeys.FRIEND_LIST_PREFIX, currentUserId,
                 new TypeReference<List<FriendVO>>() {},
                 friendMapper::selectFriendList,
-                RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
+                CacheKeys.EXPIRE_NORMAL + new Random().nextLong(10), TimeUnit.MINUTES);
         return friendVOList;
     }
 
@@ -51,16 +51,16 @@ public class FriendServiceImpl implements FriendService {
             friendRemarkUpdateDTO.setRemarkName(null);
         }
         friendMapper.updateFriendRemark(currentUserId, friendRemarkUpdateDTO);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + currentUserId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + currentUserId + ":" + friendRemarkUpdateDTO.getFriendId());
+        cacheClient.delete(CacheKeys.friendList(currentUserId));
+        cacheClient.delete(CacheKeys.friendDetail(currentUserId, friendRemarkUpdateDTO.getFriendId()));
     }
 
     @Override
     public List<FriendGroupVO> getFriendGroupList(Long currentUserId) {
-        List<FriendGroupVO> friendGroupVOList = cacheClient.queryWithPassThrough(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX, currentUserId,
+        List<FriendGroupVO> friendGroupVOList = cacheClient.queryWithPassThrough(CacheKeys.FRIEND_GROUP_PREFIX, currentUserId,
                 new TypeReference<List<FriendGroupVO>>() {},
                 friendMapper::selectFriendGroupList,
-                RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
+                CacheKeys.EXPIRE_NORMAL + new Random().nextLong(10), TimeUnit.MINUTES);
         return friendGroupVOList;
     }
 
@@ -73,7 +73,7 @@ public class FriendServiceImpl implements FriendService {
                 .toList();
 
         List<String> redisKeys = friendIds.stream()
-                .map(id -> "user:online:" + id)
+                .map(CacheKeys::userOnline)
                 .collect(Collectors.toList());
 
         List<Object> onlineStatusList = redisTemplate.opsForValue().multiGet(redisKeys);
@@ -89,10 +89,10 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public FriendDetailVO getFriendDetail(Long currentUserId, Long friendId) {
-        FriendDetailVO friendDetailVO = cacheClient.queryWithPassThrough(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX, currentUserId + ":" + friendId,
+        FriendDetailVO friendDetailVO = cacheClient.queryWithPassThrough(CacheKeys.FRIEND_DETAIL_PREFIX, currentUserId + ":" + friendId,
                 new TypeReference<FriendDetailVO>() {},
                 id -> friendMapper.selectFriendDetail(currentUserId, Long.parseLong(id.split(":")[1])),
-                RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
+                CacheKeys.EXPIRE_NORMAL + new Random().nextLong(10), TimeUnit.MINUTES);
         return friendDetailVO;
     }
 
@@ -119,12 +119,12 @@ public class FriendServiceImpl implements FriendService {
             friendMapper.deleteFriend(friendId, currentUserId, deletedTime);
         }
 
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + currentUserId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + currentUserId + ":" + friendId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX + currentUserId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + friendId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + friendId + ":" + currentUserId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX + friendId);
+        cacheClient.delete(CacheKeys.friendList(currentUserId));
+        cacheClient.delete(CacheKeys.friendDetail(currentUserId, friendId));
+        cacheClient.delete(CacheKeys.friendGroup(currentUserId));
+        cacheClient.delete(CacheKeys.friendList(friendId));
+        cacheClient.delete(CacheKeys.friendDetail(friendId, currentUserId));
+        cacheClient.delete(CacheKeys.friendGroup(friendId));
 
         SpacePostMqDTO spacePostMqDTO1 = SpacePostMqDTO.builder()
                 .authorId(friendId)
@@ -145,8 +145,8 @@ public class FriendServiceImpl implements FriendService {
     @Override
     public void updateFriendGroup(Long currentUserId, FriendGroupUpdateDTO friendGroupUpdateDTO) {
         friendMapper.updateFriendGroup(currentUserId, friendGroupUpdateDTO);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + currentUserId);
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + currentUserId + ":" + friendGroupUpdateDTO.getFriendId());
-        cacheClient.delete(RedisConstants.CACHE_FRIEND_GROUP_KEY_PREFIX + currentUserId);
+        cacheClient.delete(CacheKeys.friendList(currentUserId));
+        cacheClient.delete(CacheKeys.friendDetail(currentUserId, friendGroupUpdateDTO.getFriendId()));
+        cacheClient.delete(CacheKeys.friendGroup(currentUserId));
     }
 }

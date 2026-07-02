@@ -1,8 +1,8 @@
 package com.minichat.user.service.impl;
 
 import com.alibaba.fastjson2.TypeReference;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.OssConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.common.constants.UserConstants;
 import com.minichat.common.enums.GenderEnum;
 import com.minichat.common.exception.ErrorCode;
@@ -62,7 +62,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void register(RegisterDTO registerDTO) {
         String username = registerDTO.getUsername();
-        RLock lock = redissonClient.getLock(RedisConstants.LOCK_REGISTER_KEY_PREFIX + username);
+        RLock lock = redissonClient.getLock(CacheKeys.lockRegister(username));
         try {
             if (!lock.tryLock(5, TimeUnit.SECONDS)) {
                 throw new UserException(ErrorCode.INTERNAL_ERROR, "注册过于频繁，请稍后重试");
@@ -165,7 +165,7 @@ public class UserServiceImpl implements UserService {
             throw new UserException(ErrorCode.BAD_REQUEST, "用户ID不能为空");
         }
 
-        UserDetailVO userDetailVO = cacheClient.queryWithPassThrough(RedisConstants.CACHE_USER_DETAIL_KEY, currentUserId, new TypeReference<UserDetailVO>() {},
+        UserDetailVO userDetailVO = cacheClient.queryWithPassThrough(CacheKeys.USER_DETAIL_PREFIX, currentUserId, new TypeReference<UserDetailVO>() {},
                 userId -> {
                     User user = userMapper.selectById(userId);
                     String gender = GenderEnum.getTextByCode(user.getGender());
@@ -178,7 +178,7 @@ public class UserServiceImpl implements UserService {
                             .createdTime(user.getCreatedTime())
                             .build();
                 },
-                RedisConstants.CACHE_NORMAL_EXPIRE_TIME + new Random().nextLong(10), TimeUnit.MINUTES);
+                CacheKeys.EXPIRE_NORMAL + new Random().nextLong(10), TimeUnit.MINUTES);
 
         return userDetailVO;
     }
@@ -212,7 +212,7 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.updateAvatar(currentUserId, newAvatarUrl);
-        cacheClient.delete(RedisConstants.CACHE_USER_DETAIL_KEY + currentUserId);
+        cacheClient.delete(CacheKeys.userDetail(currentUserId));
         clearFriendCacheForUser(currentUserId);
 
         return newAvatarUrl;
@@ -244,7 +244,7 @@ public class UserServiceImpl implements UserService {
                 .signature(user.getSignature())
                 .createdTime(user.getCreatedTime())
                 .build();
-        cacheClient.delete(RedisConstants.CACHE_USER_DETAIL_KEY + currentUserId);
+        cacheClient.delete(CacheKeys.userDetail(currentUserId));
         clearFriendCacheForUser(currentUserId);
 
         return userDetailVO;
@@ -257,8 +257,8 @@ public class UserServiceImpl implements UserService {
         }
         List<String> keys = new ArrayList<>();
         for (Long ownerId : ownerIds) {
-            keys.add(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + ownerId);
-            keys.add(RedisConstants.CACHE_FRIEND_DETAIL_KEY_PREFIX + ownerId + ":" + userId);
+            keys.add(CacheKeys.friendList(ownerId));
+            keys.add(CacheKeys.friendDetail(ownerId, userId));
         }
         cacheClient.deleteBatch(keys);
     }

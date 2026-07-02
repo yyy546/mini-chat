@@ -1,9 +1,9 @@
 package com.minichat.space.listener;
 
 
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.FeedConstants;
 import com.minichat.common.constants.MqConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.friend.service.FriendService;
 import com.minichat.friend.vo.FriendVO;
 import com.minichat.space.dto.SpacePostMqDTO;
@@ -50,9 +50,9 @@ public class SpacePostListener {
             followedUserIds.add(authorId);
 
             followedUserIds.forEach(followedUserId -> {
-                redisTemplate.opsForZSet().add(RedisConstants.FEED_FOLLOWED_KEY_PREFIX + followedUserId, spacePostId, timestamp );
+                redisTemplate.opsForZSet().add(CacheKeys.feedFollowed(followedUserId), spacePostId, timestamp );
                 //修剪zset, 保留最新的500个
-                redisTemplate.opsForZSet().removeRange(RedisConstants.FEED_FOLLOWED_KEY_PREFIX + followedUserId, 0, FeedConstants.FEED_TRIM_END_INDEX);
+                redisTemplate.opsForZSet().removeRange(CacheKeys.feedFollowed(followedUserId), 0, FeedConstants.FEED_TRIM_END_INDEX);
             });
                 log.info("空间帖子 {} 推送给好友成功", spacePostId);
         } catch (Exception e) {
@@ -83,7 +83,7 @@ public class SpacePostListener {
             followedUserIds.add(authorId);
 
             followedUserIds.forEach(followedUserId -> {
-                redisTemplate.opsForZSet().remove(RedisConstants.FEED_FOLLOWED_KEY_PREFIX + followedUserId, spacePostId);
+                redisTemplate.opsForZSet().remove(CacheKeys.feedFollowed(followedUserId), spacePostId);
             });
                 log.info("空间帖子 {} 从好友的zset中删除成功", spacePostId);
         } catch (Exception e) {
@@ -113,7 +113,7 @@ public class SpacePostListener {
             }
             
             // 从目标用户的Feed流中移除这些帖子
-            redisTemplate.opsForZSet().remove(RedisConstants.FEED_FOLLOWED_KEY_PREFIX + targetUserId, postIds.toArray());
+            redisTemplate.opsForZSet().remove(CacheKeys.feedFollowed(targetUserId), postIds.toArray());
             
             log.info("删除好友所有空间帖子成功, authorId: {}, targetUserId: {}", authorId, targetUserId);
         }catch(Exception e){

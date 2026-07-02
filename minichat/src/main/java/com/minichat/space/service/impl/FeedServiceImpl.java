@@ -1,7 +1,7 @@
 package com.minichat.space.service.impl;
 
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.FeedConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.common.result.ScrollResult;
 import com.minichat.common.util.UserContext;
 import com.minichat.space.mapper.SpacePostMapper;
@@ -25,7 +25,7 @@ public class FeedServiceImpl implements FeedService {
     @Override
     public ScrollResult feed(Long maxTimeStamp, Long offset) {
         Long currentUserId = UserContext.getCurUserId();
-        String key = RedisConstants.FEED_FOLLOWED_KEY_PREFIX + currentUserId;
+        String key = CacheKeys.feedFollowed(currentUserId);
         Set<ZSetOperations.TypedTuple<Object>> typedTuples = redisTemplate.opsForZSet()
                 .reverseRangeByScoreWithScores(key, FeedConstants.MIN_SCORE_TIMESTAMP, maxTimeStamp, offset, FeedConstants.DEFAULT_PAGE_SIZE);
         if (typedTuples == null || typedTuples.isEmpty()) {
