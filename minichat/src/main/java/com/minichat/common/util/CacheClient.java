@@ -4,8 +4,8 @@ import com.alibaba.fastjson2.TypeReference;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.minichat.common.RedisData;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.MqConstants;
-import com.minichat.common.constants.RedisConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -16,6 +16,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -75,6 +80,35 @@ public class CacheClient {
                 keys);
     }
 
+    // 批量查询缓存（Redis multiGet 批量读取）
+    @SuppressWarnings("unchecked")
+    public <T> Map<String, T> batchQuery(List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object> values = redisTemplate.opsForValue().multiGet(keys);
+        if (values == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, T> result = new HashMap<>();
+        for (int i = 0; i < keys.size(); i++) {
+            Object value = values.get(i);
+            if (value != null) {
+                result.put(keys.get(i), (T) value);
+            }
+        }
+        return result;
+    }
+
+    // 按模式删除缓存（如 cache:friend:*:123）
+    public void deleteByPattern(String pattern) {
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            invalidateCaffeineBatch(keys);
+            deleteFromRedisBatch(keys);
+        }
+    }
+
     // 解决缓存穿透问题（支持复杂类型，如 List<T>）
     public <R, ID> R queryWithPassThrough(String keyPrefix, ID id, TypeReference<R> typeReference,
                                           Function<ID, R> dbFallback, Long expireTime, TimeUnit timeUnit) {
@@ -120,7 +154,7 @@ public class CacheClient {
         R dbResult = dbFallback.apply(id);
         //如果数据库中也没有数据，将空值缓存到一级缓存和二级缓存
         if(dbResult == null) {
-            set(key, "", RedisConstants.CACHE_NULL_EXPIRE_TIME, TimeUnit.SECONDS);
+            set(key, "", CacheKeys.EXPIRE_NULL_SECONDS, TimeUnit.SECONDS);
             return null;
         }
         //有数据，将数据库中的数据缓存到一级缓存和二级缓存
@@ -198,12 +232,12 @@ public class CacheClient {
      * 缓存重建
      */
     private <ID, R> void rebuildCache(String key, ID id, Function<ID, R> dbFallback, Long time, TimeUnit timeUnit) {
-        String lockKey = RedisConstants.LOCK_KEY_PREFIX + key;
+        String lockKey = CacheKeys.lock(key);
         CACHE_REBUILD_EXECUTOR.submit(() -> {
             RLock lock = redissonClient.getLock(lockKey);
             boolean isLock;
             try {
-                isLock = lock.tryLock(RedisConstants.WAIT_TIME , RedisConstants.LOCK_EXPIRE_TIME, TimeUnit.SECONDS);
+                isLock = lock.tryLock(CacheKeys.LOCK_WAIT_SECONDS, CacheKeys.LOCK_EXPIRE_SECONDS, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 log.error("Redis锁获取异常，key：{}，原因：{}", lockKey, e.getMessage(), e);
                 return;

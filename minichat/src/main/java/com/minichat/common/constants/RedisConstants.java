@@ -1,53 +1,50 @@
 package com.minichat.common.constants;
 
+import com.minichat.common.cache.CacheKeys;
+
+/**
+ * @deprecated 使用 {@link CacheKeys} 替代。本类保留仅为向后兼容，新代码请使用 CacheKeys。
+ */
+@Deprecated
 public class RedisConstants {
-    // 在线用户状态键前缀
-    public static final String USER_ONLINE_USER_KEY_PREFIX = "user:online:";
-    // 状态推送的主题
-    public static final String STATUS_TOPIC = "/topic/user-status";
-    // 在线状态过期时间（秒）
-    public static final Long ONLINE_STATUS_EXPIRE_TIME = 300L;
 
-    public static final String GROUP_MESSAGE_SEQ_KEY_PREFIX = "group_msg_seq:";
+    @Deprecated
+    public static final String USER_ONLINE_USER_KEY_PREFIX = CacheKeys.USER_ONLINE_PREFIX;
+    @Deprecated
+    public static final String STATUS_TOPIC = CacheKeys.STATUS_TOPIC;
+    @Deprecated
+    public static final Long ONLINE_STATUS_EXPIRE_TIME = CacheKeys.EXPIRE_ONLINE_SECONDS;
 
-    // 缓存空值过期时间（秒）
-    public static final Long CACHE_NULL_EXPIRE_TIME = 30L;
-    // 缓存正常过期时间（分钟）
-    public static final Long CACHE_NORMAL_EXPIRE_TIME = 10L;
-    // 缓存锁过期时间（秒）
-    public static final Long LOCK_EXPIRE_TIME = 30L;
-    // 缓存锁等待时间（秒）
-    public static final Long WAIT_TIME = 1L;
-    /**
-     * 用户详情缓存键前缀
-     */
+    @Deprecated
+    public static final String GROUP_MESSAGE_SEQ_KEY_PREFIX = CacheKeys.GROUP_MESSAGE_SEQ_PREFIX;
 
-    public static final String CACHE_USER_DETAIL_KEY = "cache:user:detail:";
+    @Deprecated
+    public static final Long CACHE_NULL_EXPIRE_TIME = CacheKeys.EXPIRE_NULL_SECONDS;
+    @Deprecated
+    public static final Long CACHE_NORMAL_EXPIRE_TIME = CacheKeys.EXPIRE_NORMAL;
+    @Deprecated
+    public static final Long LOCK_EXPIRE_TIME = CacheKeys.LOCK_EXPIRE_SECONDS;
+    @Deprecated
+    public static final Long WAIT_TIME = CacheKeys.LOCK_WAIT_SECONDS;
 
-    /**
-     * 好友相关缓存键前缀
-     */
-    public static final String CACHE_FRIEND_LIST_KEY_PREFIX = "cache:friend:list:";
-    public static final String CACHE_FRIEND_GROUP_KEY_PREFIX = "cache:friend:group:";
-    public static final String CACHE_FRIEND_DETAIL_KEY_PREFIX = "cache:friend:detail:";
-
-    /**
-     * 群组相关缓存键前缀
-     */
-    public static final String CACHE_USER_GROUP_LIST_KEY_PREFIX = "cache:group:list:";
-    public static final String CACHE_GROUP_PROFILE_KEY_PREFIX = "cache:group:profile:";
+    @Deprecated
+    public static final String CACHE_USER_DETAIL_KEY = CacheKeys.USER_DETAIL_PREFIX;
+    @Deprecated
+    public static final String CACHE_FRIEND_LIST_KEY_PREFIX = CacheKeys.FRIEND_LIST_PREFIX;
+    @Deprecated
+    public static final String CACHE_FRIEND_GROUP_KEY_PREFIX = CacheKeys.FRIEND_GROUP_PREFIX;
+    @Deprecated
+    public static final String CACHE_FRIEND_DETAIL_KEY_PREFIX = CacheKeys.FRIEND_DETAIL_PREFIX;
+    @Deprecated
+    public static final String CACHE_USER_GROUP_LIST_KEY_PREFIX = CacheKeys.USER_GROUP_LIST_PREFIX;
+    @Deprecated
+    public static final String CACHE_GROUP_PROFILE_KEY_PREFIX = CacheKeys.GROUP_PROFILE_PREFIX;
+    @Deprecated
     public static final String LOCK_KEY_PREFIX = "lock:";
+    @Deprecated
+    public static final String FEED_FOLLOWED_KEY_PREFIX = CacheKeys.FEED_FOLLOWED_PREFIX;
+    @Deprecated
+    public static final String LOCK_REGISTER_KEY_PREFIX = "lock:register:";
 
-    /**
-     * 动态相关缓存键前缀
-     */
-    public static final String FEED_FOLLOWED_KEY_PREFIX = "feed:followed:";
-
-     /**
-     * 注册锁键前缀
-     */
-    public static final String LOCK_REGISTER_KEY_PREFIX = LOCK_KEY_PREFIX + "register:";
-
-
-    private RedisConstants(){}
+    private RedisConstants() {}
 }

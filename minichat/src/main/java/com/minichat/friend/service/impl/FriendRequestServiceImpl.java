@@ -1,7 +1,7 @@
 package com.minichat.friend.service.impl;
 
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.FriendConstants;
-import com.minichat.common.constants.RedisConstants;
 import com.minichat.common.constants.RequestConstants;
 import com.minichat.common.exception.ErrorCode;
 import com.minichat.common.exception.FriendException;
@@ -94,7 +94,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
                         .createdTime(now)
                         .build();
                 friendMapper.restoreFriend(friend1);
-                cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + friendRequest.getFromUserId());
+                cacheClient.delete(CacheKeys.friendList(friendRequest.getFromUserId()));
             } else if (existingFriend1 == null) {
                 Friend friend1 = Friend.builder()
                         .userId(friendRequest.getFromUserId())
@@ -105,7 +105,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
                         .createdTime(now)
                         .build();
                 friendMapper.insert(friend1);
-                cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + friendRequest.getFromUserId());
+                cacheClient.delete(CacheKeys.friendList(friendRequest.getFromUserId()));
             }
 
             Friend existingFriend2 = friendMapper.selectFriendRecord(
@@ -122,7 +122,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
                         .createdTime(now)
                         .build();
                 friendMapper.restoreFriend(friend2);
-                cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + friendRequest.getToUserId());
+                cacheClient.delete(CacheKeys.friendList(friendRequest.getToUserId()));
 
             } else if (existingFriend2 == null) {
                 Friend friend2 = Friend.builder()
@@ -134,7 +134,7 @@ public class FriendRequestServiceImpl implements FriendRequestService {
                         .createdTime(now)
                         .build();
                 friendMapper.insert(friend2);
-                cacheClient.delete(RedisConstants.CACHE_FRIEND_LIST_KEY_PREFIX + friendRequest.getToUserId());
+                cacheClient.delete(CacheKeys.friendList(friendRequest.getToUserId()));
 
             }
 

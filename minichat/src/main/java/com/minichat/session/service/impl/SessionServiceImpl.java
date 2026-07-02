@@ -5,7 +5,7 @@ import com.minichat.friend.vo.FriendVO;
 import com.minichat.group.service.GroupService;
 import com.minichat.group.vo.GroupVO;
 import com.minichat.session.vo.SessionVO;
-import com.minichat.common.constants.RedisConstants;
+import com.minichat.common.cache.CacheKeys;
 import com.minichat.common.constants.SessionConstants;
 import com.minichat.group.dto.GroupMemberLastReadDTO;
 import com.minichat.chat.dto.MessageUnreadCountDTO;
@@ -95,7 +95,7 @@ public class SessionServiceImpl implements SessionService {
 
             // 【Redis 批量优化】一次性获取所有群的当前最新 Seq
             List<String> redisKeys = groupIds.stream()
-                    .map(id -> RedisConstants.GROUP_MESSAGE_SEQ_KEY_PREFIX + id)
+                    .map(id -> CacheKeys.groupMessageSeq(id))
                     .toList();
             List<Object> currentSeqs = redisTemplate.opsForValue().multiGet(redisKeys); // 使用 multiGet
 
