@@ -1,9 +1,9 @@
 package com.minichat.space.service.impl;
 
-import com.minichat.common.constants.SpaceConstants;
-import com.minichat.common.exception.ErrorCode;
-import com.minichat.common.exception.SpaceException;
-import com.minichat.common.util.UserContext;
+import com.minichat.space.constants.SpaceConstants;
+import com.minichat.common.core.exception.ErrorCode;
+import com.minichat.common.core.exception.SpaceException;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.space.dto.PublishSpaceCommentDTO;
 import com.minichat.space.entity.SpaceComment;
 import com.minichat.space.entity.SpacePost;

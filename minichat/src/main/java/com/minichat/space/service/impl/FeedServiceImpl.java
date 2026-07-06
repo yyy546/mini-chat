@@ -1,9 +1,9 @@
 package com.minichat.space.service.impl;
 
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.constants.FeedConstants;
-import com.minichat.common.result.ScrollResult;
-import com.minichat.common.util.UserContext;
+import com.minichat.space.constants.FeedConstants;
+import com.minichat.common.core.result.ScrollResult;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.space.mapper.SpacePostMapper;
 import com.minichat.space.service.FeedService;
 import com.minichat.space.vo.SpacePostVO;

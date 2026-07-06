@@ -1,7 +1,7 @@
 package com.minichat.space.controller;
 
-import com.minichat.common.result.Result;
-import com.minichat.common.result.ScrollResult;
+import com.minichat.common.core.result.Result;
+import com.minichat.common.core.result.ScrollResult;
 import com.minichat.space.service.FeedService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

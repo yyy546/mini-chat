@@ -1,9 +1,9 @@
 package com.minichat.chat.service.impl;
 
 import com.minichat.chat.vo.FileVO;
-import com.minichat.common.constants.MessageConstants;
-import com.minichat.common.exception.FileException;
-import com.minichat.common.util.OssFileUtil;
+import com.minichat.common.core.constants.MessageConstants;
+import com.minichat.common.core.exception.FileException;
+import com.minichat.common.core.util.OssFileUtil;
 import io.micrometer.common.util.StringUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

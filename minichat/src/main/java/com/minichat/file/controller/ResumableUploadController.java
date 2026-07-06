@@ -1,7 +1,7 @@
 package com.minichat.file.controller;
 
-import com.minichat.common.result.Result;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.core.result.Result;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.file.dto.UploadCompleteResponseDTO;
 import com.minichat.file.dto.UploadInitRequestDTO;
 import com.minichat.file.dto.UploadInitResponseDTO;

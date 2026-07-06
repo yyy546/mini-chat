@@ -2,8 +2,8 @@ package com.minichat.chat.controller;
 
 import com.minichat.chat.entity.EsChatMessage;
 import com.minichat.chat.service.ChatSearchService;
-import com.minichat.common.result.Result;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.core.result.Result;
+import com.minichat.common.security.jwt.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;

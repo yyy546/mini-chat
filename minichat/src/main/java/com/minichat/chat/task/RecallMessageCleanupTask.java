@@ -2,7 +2,7 @@ package com.minichat.chat.task;
 
 import com.minichat.chat.mapper.GroupMessageMapper;
 import com.minichat.chat.mapper.PrivateMessageMapper;
-import com.minichat.common.constants.MessageConstants;
+import com.minichat.common.core.constants.MessageConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

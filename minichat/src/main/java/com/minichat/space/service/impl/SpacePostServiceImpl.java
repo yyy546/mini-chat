@@ -1,12 +1,12 @@
 package com.minichat.space.service.impl;
 
 import com.alibaba.fastjson2.JSONArray;
-import com.minichat.common.constants.MqConstants;
-import com.minichat.common.constants.SpaceConstants;
-import com.minichat.common.exception.ErrorCode;
-import com.minichat.common.exception.SpaceException;
-import com.minichat.common.util.OssFileUtil;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.mq.MqConstants;
+import com.minichat.space.constants.SpaceConstants;
+import com.minichat.common.core.exception.ErrorCode;
+import com.minichat.common.core.exception.SpaceException;
+import com.minichat.common.core.util.OssFileUtil;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.friend.mapper.FriendMapper;
 import com.minichat.space.dto.PublishSpacePostDTO;
 import com.minichat.space.dto.SpacePostMqDTO;

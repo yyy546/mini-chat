@@ -1,7 +1,7 @@
 package com.minichat.group.service.impl;
 
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.util.CacheClient;
+import com.minichat.common.cache.CacheClient;
 import com.minichat.group.mapper.ChatGroupMapper;
 import com.minichat.group.mapper.GroupMemberMapper;
 import jakarta.annotation.Resource;

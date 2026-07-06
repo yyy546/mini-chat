@@ -6,7 +6,7 @@ import com.minichat.group.service.GroupService;
 import com.minichat.group.vo.GroupVO;
 import com.minichat.session.vo.SessionVO;
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.constants.SessionConstants;
+import com.minichat.common.core.constants.SessionConstants;
 import com.minichat.group.dto.GroupMemberLastReadDTO;
 import com.minichat.chat.dto.MessageUnreadCountDTO;
 import com.minichat.chat.entity.GroupMessage;

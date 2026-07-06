@@ -2,8 +2,8 @@ package com.minichat.space.listener;
 
 
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.constants.FeedConstants;
-import com.minichat.common.constants.MqConstants;
+import com.minichat.space.constants.FeedConstants;
+import com.minichat.common.mq.MqConstants;
 import com.minichat.friend.service.FriendService;
 import com.minichat.friend.vo.FriendVO;
 import com.minichat.space.dto.SpacePostMqDTO;

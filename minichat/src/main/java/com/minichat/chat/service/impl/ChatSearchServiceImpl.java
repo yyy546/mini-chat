@@ -5,12 +5,10 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.minichat.chat.entity.EsChatMessage;
 import com.minichat.chat.service.ChatSearchService;
-import com.minichat.common.constants.MessageConstants;
-import com.minichat.common.constants.SessionConstants;
-import jakarta.annotation.PostConstruct;
+import com.minichat.common.core.constants.MessageConstants;
+import com.minichat.common.core.constants.SessionConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;

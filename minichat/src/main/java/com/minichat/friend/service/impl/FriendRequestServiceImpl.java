@@ -1,12 +1,12 @@
 package com.minichat.friend.service.impl;
 
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.constants.FriendConstants;
-import com.minichat.common.constants.RequestConstants;
-import com.minichat.common.exception.ErrorCode;
-import com.minichat.common.exception.FriendException;
-import com.minichat.common.util.CacheClient;
-import com.minichat.common.util.UserContext;
+import com.minichat.friend.constants.FriendConstants;
+import com.minichat.common.core.constants.RequestConstants;
+import com.minichat.common.core.exception.ErrorCode;
+import com.minichat.common.core.exception.FriendException;
+import com.minichat.common.cache.CacheClient;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.friend.dto.FriendRequestDTO;
 import com.minichat.friend.dto.HandleFriendRequestDTO;
 import com.minichat.friend.entity.Friend;

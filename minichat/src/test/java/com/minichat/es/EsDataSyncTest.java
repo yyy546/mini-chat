@@ -3,7 +3,7 @@ package com.minichat.es;
 import com.minichat.chat.entity.EsChatMessage;
 import com.minichat.chat.service.ChatSearchService;
 import com.minichat.chat.service.impl.ChatSearchServiceImpl;
-import com.minichat.common.constants.SessionConstants;
+import com.minichat.common.core.constants.SessionConstants;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
