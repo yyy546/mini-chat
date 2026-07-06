@@ -2,10 +2,10 @@ package com.minichat.friend.service.impl;
 
 import com.alibaba.fastjson2.TypeReference;
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.constants.MqConstants;
-import com.minichat.common.exception.ErrorCode;
-import com.minichat.common.exception.FriendException;
-import com.minichat.common.util.CacheClient;
+import com.minichat.common.mq.MqConstants;
+import com.minichat.common.core.exception.ErrorCode;
+import com.minichat.common.core.exception.FriendException;
+import com.minichat.common.cache.CacheClient;
 import com.minichat.friend.dto.FriendGroupUpdateDTO;
 import com.minichat.friend.dto.FriendRemarkUpdateDTO;
 import com.minichat.friend.mapper.FriendMapper;

@@ -1,5 +1,6 @@
 package com.minichat.common.util.sensitive;
 
+import com.minichat.common.sensitive.engine.SensitiveWordService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

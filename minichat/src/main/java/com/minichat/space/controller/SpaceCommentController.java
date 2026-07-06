@@ -1,6 +1,6 @@
 package com.minichat.space.controller;
 
-import com.minichat.common.result.Result;
+import com.minichat.common.core.result.Result;
 import com.minichat.space.dto.PublishSpaceCommentDTO;
 import com.minichat.space.service.SpaceCommentService;
 import com.minichat.space.vo.SpaceCommentVO;

@@ -2,11 +2,11 @@ package com.minichat.group.service.impl;
 
 import com.alibaba.fastjson2.TypeReference;
 import com.minichat.common.cache.CacheKeys;
-import com.minichat.common.constants.GroupConstants;
-import com.minichat.common.exception.ErrorCode;
-import com.minichat.common.exception.GroupException;
-import com.minichat.common.util.OssFileUtil;
-import com.minichat.common.util.UserContext;
+import com.minichat.group.constants.GroupConstants;
+import com.minichat.common.core.exception.ErrorCode;
+import com.minichat.common.core.exception.GroupException;
+import com.minichat.common.core.util.OssFileUtil;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.group.dto.CreateGroupDTO;
 import com.minichat.group.dto.GroupMemberAddDTO;
 import com.minichat.group.dto.GroupMemberRemoveDTO;

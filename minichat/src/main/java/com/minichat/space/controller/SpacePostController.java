@@ -1,7 +1,7 @@
 package com.minichat.space.controller;
 
-import com.minichat.common.exception.ValidationException;
-import com.minichat.common.result.Result;
+import com.minichat.common.core.exception.ValidationException;
+import com.minichat.common.core.result.Result;
 import com.minichat.space.dto.PublishSpacePostDTO;
 import com.minichat.space.service.SpacePostService;
 import com.minichat.space.vo.SpacePostVO;

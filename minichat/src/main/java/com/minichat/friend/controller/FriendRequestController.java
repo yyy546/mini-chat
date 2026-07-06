@@ -1,8 +1,8 @@
 package com.minichat.friend.controller;
 
-import com.minichat.common.exception.AuthException;
-import com.minichat.common.result.Result;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.core.exception.AuthException;
+import com.minichat.common.core.result.Result;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.friend.dto.FriendRequestDTO;
 import com.minichat.friend.dto.HandleFriendRequestDTO;
 import com.minichat.friend.service.FriendRequestService;

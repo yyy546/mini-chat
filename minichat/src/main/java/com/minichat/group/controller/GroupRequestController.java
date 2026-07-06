@@ -1,8 +1,8 @@
 package com.minichat.group.controller;
 
-import com.minichat.common.exception.AuthException;
-import com.minichat.common.result.Result;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.core.exception.AuthException;
+import com.minichat.common.core.result.Result;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.group.dto.GroupRequestDTO;
 import com.minichat.group.dto.HandleGroupRequestDTO;
 import com.minichat.group.service.GroupRequestService;

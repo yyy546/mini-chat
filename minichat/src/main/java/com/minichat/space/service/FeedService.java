@@ -1,6 +1,6 @@
 package com.minichat.space.service;
 
-import com.minichat.common.result.ScrollResult;
+import com.minichat.common.core.result.ScrollResult;
 
 public interface FeedService {
 

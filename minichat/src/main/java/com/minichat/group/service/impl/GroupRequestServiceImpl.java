@@ -1,10 +1,10 @@
 package com.minichat.group.service.impl;
 
-import com.minichat.common.constants.GroupConstants;
-import com.minichat.common.constants.RequestConstants;
-import com.minichat.common.exception.ErrorCode;
-import com.minichat.common.exception.GroupException;
-import com.minichat.common.util.UserContext;
+import com.minichat.group.constants.GroupConstants;
+import com.minichat.common.core.constants.RequestConstants;
+import com.minichat.common.core.exception.ErrorCode;
+import com.minichat.common.core.exception.GroupException;
+import com.minichat.common.security.jwt.UserContext;
 import com.minichat.group.dto.GroupRequestDTO;
 import com.minichat.group.dto.HandleGroupRequestDTO;
 import com.minichat.group.entity.ChatGroup;

@@ -1,8 +1,8 @@
 package com.minichat.user.controller;
 
-import com.minichat.common.result.Result;
+import com.minichat.common.core.result.Result;
 import com.minichat.user.service.UserOnlineStatusService;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.security.jwt.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

@@ -1,7 +1,7 @@
 package com.minichat.file.service.impl;
 
 import com.aliyun.oss.model.PartETag;
-import com.minichat.common.util.SnowflakeIdWorker;
+import com.minichat.common.core.util.SnowflakeIdWorker;
 import com.minichat.file.dto.UploadCompleteResponseDTO;
 import com.minichat.file.dto.UploadInitRequestDTO;
 import com.minichat.file.dto.UploadInitResponseDTO;
@@ -12,7 +12,6 @@ import com.minichat.file.mapper.UploadPartMapper;
 import com.minichat.file.mapper.UploadTaskMapper;
 import com.minichat.file.oss.OssMultipartClient;
 import com.minichat.file.service.ResumableUploadService;
-import io.jsonwebtoken.lang.Assert;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

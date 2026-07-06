@@ -1,7 +1,7 @@
 package com.minichat.friend.controller;
 
-import com.minichat.common.exception.AuthException;
-import com.minichat.common.result.Result;
+import com.minichat.common.core.exception.AuthException;
+import com.minichat.common.core.result.Result;
 import com.minichat.friend.dto.FriendGroupUpdateDTO;
 import com.minichat.friend.dto.FriendRemarkUpdateDTO;
 import com.minichat.friend.service.FriendService;
@@ -9,7 +9,7 @@ import com.minichat.friend.vo.FriendDetailVO;
 import com.minichat.friend.vo.FriendGroupItemVO;
 import com.minichat.friend.vo.FriendGroupVO;
 import com.minichat.friend.vo.FriendVO;
-import com.minichat.common.util.UserContext;
+import com.minichat.common.security.jwt.UserContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
